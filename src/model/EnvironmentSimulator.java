@@ -1,9 +1,12 @@
 package model;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Simulates environmental conditions that may affect route planning,
  * including weather, traffic, and road obstacles. Manages environmental
- * conditions and calculate the adjusted travel time.
+ * conditions and calculates the adjusted travel time.
  *
  * @author Allia Hussain
  * @version 31 October 2026
@@ -23,7 +26,10 @@ public class EnvironmentSimulator {
             return myRiskFactor;
         }
     }
+    /** The current weather condition in the simulation. */
     private WeatherCondition myWeather;
+
+    /** The map graph containing the intersections and roads in the simulation. */
     private final MapGraph myMapGraph;
 
     /**
@@ -55,22 +61,32 @@ public class EnvironmentSimulator {
     }
 
     /**
-     * Adds a road to the collection of blocked roads.
+     * Blocks the specified road.
      *
-     * @param theRoad the ID of the road to block
+     * @param theRoad the road to block
      */
-//    public void blockRoad(String theRoad) { //change to "road theRoad" when road is implemented
-//        myBlockedRoads.add(theRoad);
-//    }
+    public void blockRoad(Road theRoad) {
+        theRoad.setBlocked(true);
+    }
 
     /**
-     * Removes a road from the collection of blocked roads.
+     * Unblocks the specified road.
      *
-     * @param theRoad the ID of the road to unblock
+     * @param theRoad the road to unblock
      */
-//    public void unBlockedRoad(String theRoad) { //change to "road theRoad" when road is implemented
-//        myBlockedRoads.remove(theRoad);
-//    }
+    public void unBlockedRoad(Road theRoad) {
+        theRoad.setBlocked(false);
+    }
+
+    /**
+     * Updates the traffic delay for the specified road.
+     *
+     * @param theRoad the road whose traffic delay is being changed
+     * @param theDelay the new traffic delay in hours
+     */
+    public void changeTraffic(Road theRoad, double theDelay) {
+        theRoad.setTrafficDelay(theDelay);
+    }
 
     /**
      * Calculates the adjusted speed limit based on current weather conditions.
@@ -78,28 +94,60 @@ public class EnvironmentSimulator {
      * @param theRoad the road whose speed limit will be adjusted
      * @return the adjusted speed limit
      */
-//    public double calculateAdjustedSpeed(Road theRoad) {
-//      double originalSpeed = theRoad.getSpeedLimit();
-//      if (myWeather == WeatherCondition.CLEAR) {
-//          return originalSpeed;
-//      } else if (myWeather == WeatherCondition.RAINY) {
-//          return originalSpeed * 0.80;
-//      } else if (myWeather == WeatherCondition.SNOWY) {
-//          return originalSpeed * 0.5;
-//      }
-//      return originalSpeed;
-//    }
+    public double calculateAdjustedSpeed(Road theRoad) {
+      double originalSpeed = theRoad.getSpeedLimit();
+      if (myWeather == WeatherCondition.CLEAR) {
+          return originalSpeed;
+      } else if (myWeather == WeatherCondition.RAINY) {
+          return originalSpeed * 0.80;
+      } else if (myWeather == WeatherCondition.SNOWY) {
+          return originalSpeed * 0.5;
+      }
+      return originalSpeed;
+   }
 
     /**
-     * Calculates the adjusted travel time based on the current traffic condition.
+     * Calculates the adjusted travel time based on the current weather
+     * and traffic conditions.
      *
-     * @param theTime the original estimated travel time
-     * @return the adjusted travel time after accounting for traffic
+     * @param theRoad the road whose adjusted travel time is being calculated
+     * @return the adjusted travel time after accounting for weather and traffic
      */
-    public double calculateAdjustedTrafficTime(double theTime) {
-        return 0.0;
+    public double calculateAdjustedTravelTime(Road theRoad) {
+        double adjustedSpeed = calculateAdjustedSpeed(theRoad);
+        return theRoad.getTravelTime(adjustedSpeed);
     }
 
-    //public void changeTraffic(Road theRoad, double theDelay) {}
+    /**
+     * Blocks the specified intersection.
+     *
+     * @param theIntersection the intersection to block
+     */
+    public void blockIntersection(Intersection theIntersection) {
+        theIntersection.setBlocked(true);
+    }
 
+    /**
+     * Unblocks the specified intersection.
+     *
+     * @param theIntersection the intersection to unblock
+     */
+    public void unblockIntersection(Intersection theIntersection) {
+        theIntersection.setBlocked(false);
+    }
+
+    /**
+     * Retrieves all currently blocked intersections in the map graph.
+     *
+     * @return a list of intersections that are currently blocked
+     */
+    public List<Intersection> getBlockedIntersections() {
+        List<Intersection> list = new ArrayList<>();
+        for (Intersection intersection : myMapGraph.getIntersections()) {
+            if(intersection.isBlocked()) {
+                list.add(intersection);
+            }
+        }
+        return list;
+    }
 }
