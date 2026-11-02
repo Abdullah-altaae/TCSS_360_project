@@ -1,160 +1,266 @@
+/*
+ * TCSS 360 - Software Development and Quality Assurance Techniques
+ * Group Project: Car Route Planner
+ */
+
 package model;
+
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Represents the city map as a graph. Intersections form the nodes of the graph and
  * roads form the edges that connect them.
  *
  * <p>This is the central model class for the application. The route planner traverses
- * the graph to compute a path between two points, the safety checker inspects it when
- * evaluating a route, and the environment simulator alters the conditions of the roads
- * it contains.</p>
+ * the graph to compute a path between two intersections, and the environment simulator
+ * alters the conditions of the roads and intersections it contains.</p>
+ *
+ * <p>A road names its endpoints by intersection name (see {@link Road#getStart()} and
+ * {@link Road#getEnd()}), so both endpoints must already be in the graph before the road
+ * is added. Adding a road records it in the adjacency map and in both endpoint
+ * intersections; a road that starts and ends at the same intersection is recorded
+ * once.</p>
+ *
+ * <p>An empty graph, and an intersection with no roads, are both valid. Every list this
+ * class returns is an unmodifiable view.</p>
  *
  * @author Felix Kiama
- * @version 31 October 2026
+ * @version 2 November 2026
  */
 public final class MapGraph {
 
+    /** The intersections forming the nodes of this graph, in insertion order. */
+    private final List<Intersection> myIntersections;
 
-    /** The intersections forming the nodes of this graph.Each ID paired with the object.*/
-    private final Map<String, Intersection> myIntersections;
-
-    /** The roads forming the edges of this graph. */
+    /** The roads forming the edges of this graph, in insertion order. */
     private final List<Road> myRoads;
 
-    /** The roads reachable from each intersection. */
-    private Map<Intersection, List<Road>> myAdjacency;
+    /** The roads connected to each intersection, keyed by intersection. */
+    private final Map<Intersection, List<Road>> myAdjacency;
 
     /**
-     * Constructs a map graph from the supplied intersections and roads.
-     *
-     * <p>The supplied lists are retained by reference rather than copied, so subsequent
-     * modifications made by the caller are reflected in this graph.</p>
+     * Constructs an empty map graph with no intersections and no roads.
+     */
+    public MapGraph() {
+        myIntersections = new ArrayList<Intersection>();
+        myRoads = new ArrayList<Road>();
+        myAdjacency = new HashMap<Intersection, List<Road>>();
+    }
+
+    /**
+     * Constructs a map graph from the supplied intersections and roads. Both lists are
+     * copied, so later changes the caller makes to them are not reflected in this graph.
+     * Either list may be empty. All intersections are added before any road, so a road
+     * may refer to any intersection in theIntersections.
      *
      * @param theIntersections the intersections forming the nodes of the graph
      * @param theRoads         the roads forming the edges of the graph
+     * @throws NullPointerException     if either list is null, if either list contains a
+     *                                  null element, or if a road has a null endpoint
+     * @throws IllegalArgumentException if theIntersections contains a duplicate, if
+     *                                  theRoads contains a duplicate, or if a road's
+     *                                  endpoint is not in theIntersections
      */
-    public MapGraph(final Map<String, Intersection> theIntersections, final List<Road> theRoads) {
-        myIntersections = theIntersections;
-        myRoads = theRoads;
-        createAdjacency();
+    public MapGraph(final List<Intersection> theIntersections, final List<Road> theRoads) {
+        this();
+        Objects.requireNonNull(theIntersections, "intersection list must not be null");
+        Objects.requireNonNull(theRoads, "road list must not be null");
+        for (final Intersection intersection : theIntersections) {
+            insertIntersection(intersection);
+        }
+        for (final Road road : theRoads) {
+            insertRoad(road);
+        }
     }
 
     /**
-     * Returns the intersections contained in this graph.
+     * Adds an intersection to this graph. The intersection starts with no roads in the
+     * adjacency map, which is valid.
      *
-     * <p>This method returns a direct reference to the internal Map rather than a
-     * defensive copy. Modifications made to the returned list are reflected in this
-     * graph.</p>
-     *
-     * @return the Map of intersections in this graph
+     * @param theIntersection the intersection to add
+     * @return an unmodifiable view of all intersections in this graph
+     * @throws NullPointerException     if theIntersection is null
+     * @throws IllegalArgumentException if an intersection with the same name is already
+     *                                  in this graph
      */
-    public Map<String, Intersection> getIntersections() {
-        return myIntersections;
+    public List<Intersection> addIntersection(final Intersection theIntersection) {
+        insertIntersection(theIntersection);
+        return getIntersections();
     }
 
     /**
-     * Returns the roads contained in this graph.
+     * Adds a road to this graph. The road is recorded under both of its endpoints in the
+     * adjacency map and in both endpoint intersections; a self-loop is recorded once.
      *
-     * <p>This method returns a direct reference to the internal list rather than a
-     * defensive copy. Modifications made to the returned list are reflected in this
-     * graph.</p>
+     * @param theRoad the road to add
+     * @return an unmodifiable view of all roads in this graph
+     * @throws NullPointerException     if theRoad is null or has a null endpoint
+     * @throws IllegalArgumentException if a road with the same identifier is already in
+     *                                  this graph, or if either endpoint is not in this
+     *                                  graph
+     */
+    public List<Road> addRoad(final Road theRoad) {
+        insertRoad(theRoad);
+        return getRoads();
+    }
+
+    /**
+     * Returns the roads leaving the given intersection, that is, the connected roads
+     * whose start is that intersection. The result is empty if no road leaves it.
      *
-     * @return the list of roads in this graph
+     * @param theIntersection the intersection to look up
+     * @return an unmodifiable list of the roads that start at theIntersection
+     * @throws NullPointerException     if theIntersection is null
+     * @throws IllegalArgumentException if theIntersection is not in this graph
+     */
+    public List<Road> getRoute(final Intersection theIntersection) {
+        Objects.requireNonNull(theIntersection, "intersection must not be null");
+        final List<Road> connected = myAdjacency.get(theIntersection);
+        if (connected == null) {
+            throw new IllegalArgumentException(
+                    "intersection " + theIntersection.getName() + " is not in the graph");
+        }
+        final List<Road> leaving = new ArrayList<Road>();
+        for (final Road road : connected) {
+            if (road.getStart().equals(theIntersection.getName())) {
+                leaving.add(road);
+            }
+        }
+        return Collections.unmodifiableList(leaving);
+    }
+
+    /**
+     * Returns an unmodifiable view of the intersections in this graph, in the order they
+     * were added. The list is empty if the graph has no intersections.
+     *
+     * @return an unmodifiable view of the intersections
+     */
+    public List<Intersection> getIntersections() {
+        return Collections.unmodifiableList(myIntersections);
+    }
+
+    /**
+     * Returns an unmodifiable view of the roads in this graph, in the order they were
+     * added. The list is empty if the graph has no roads.
+     *
+     * @return an unmodifiable view of the roads
      */
     public List<Road> getRoads() {
-        return myRoads;
-    }
-
-
-
-    /**
-     * Returns the number of intersections currently in this graph.
-     *
-     * @return the number of intersections
-     */
-    public int getIntersectionsSize() {
-        return myIntersections.size();
+        return Collections.unmodifiableList(myRoads);
     }
 
     /**
-     * Returns the adjacency map, which associates each intersection with the roads
-     * connected to it. The route planner relies on this structure to determine which
-     * roads may be taken from a given intersection.
+     * Returns whether the given intersection, compared by name, is in this graph.
      *
-     * <p>This class does not yet populate the adjacency map, so the method returns
-     * {@code null} until the map has been initialized.</p>
-     *
-     * @return the adjacency map, or {@code null} if it has not been initialized
+     * @param theIntersection the intersection to look for
+     * @return {@code true} if theIntersection is in this graph, {@code false} otherwise
+     * @throws NullPointerException if theIntersection is null
      */
-    public Map<Intersection, List<Road>> getAdjacency() {
-        return myAdjacency;
+    public boolean containsIntersection(final Intersection theIntersection) {
+        Objects.requireNonNull(theIntersection, "intersection must not be null");
+        return myAdjacency.containsKey(theIntersection);
     }
 
     /**
-     * Determines whether this graph contains an intersection with the given identifier.
-     * The search is performed checking if the passed ID exists in te.
+     * Returns whether this graph has no intersections. A graph with no intersections
+     * cannot have roads either.
      *
-     * @param theName the identifier to search for
-     * @return {@code true} if a matching intersection exists in this graph,
-     *         {@code false} otherwise
+     * @return {@code true} if this graph has no intersections, {@code false} otherwise
      */
-    public boolean containsIntersection(final String theName) {
-        return myIntersections.get(theName) != null;
+    public boolean isEmpty() {
+        return myIntersections.isEmpty();
     }
 
     /**
-     * Adds a road to this graph.
+     * Validates an intersection and adds it to the graph with an empty adjacency entry.
+     * The constructor uses this helper so that it never calls a public method.
      *
-     * <p>This method does not update the adjacency map; connectivity between
-     * intersections must be established separately.</p>
-     *
-     * @param theRoad the road to add to the graph
+     * @param theIntersection the intersection to add
+     * @throws NullPointerException     if theIntersection is null
+     * @throws IllegalArgumentException if an intersection with the same name is already
+     *                                  in this graph
      */
-    public void addRoad(final Road theRoad) {
+    private void insertIntersection(final Intersection theIntersection) {
+        Objects.requireNonNull(theIntersection, "intersection must not be null");
+        if (myAdjacency.containsKey(theIntersection)) {
+            throw new IllegalArgumentException("duplicate intersection "
+                    + theIntersection.getName());
+        }
+        myIntersections.add(theIntersection);
+        myAdjacency.put(theIntersection, new ArrayList<Road>());
+    }
+
+    /**
+     * Validates a road and adds it to the graph, recording it under both endpoints in the
+     * adjacency map and in both endpoint intersections. A self-loop is recorded once.
+     * Both endpoints are checked before anything is changed, so a rejected road leaves
+     * the graph untouched. The constructor uses this helper so that it never calls a
+     * public method.
+     *
+     * @param theRoad the road to add
+     * @throws NullPointerException     if theRoad is null or has a null endpoint
+     * @throws IllegalArgumentException if a road with the same identifier is already in
+     *                                  this graph, or if either endpoint is not in this
+     *                                  graph
+     */
+    private void insertRoad(final Road theRoad) {
+        Objects.requireNonNull(theRoad, "road must not be null");
+        for (final Road existing : myRoads) {
+            if (existing.getId() == theRoad.getId()) {
+                throw new IllegalArgumentException("duplicate road with id "
+                        + theRoad.getId());
+            }
+        }
+        final Intersection start = requireKnownEndpoint(theRoad.getStart(), theRoad);
+        final Intersection end = requireKnownEndpoint(theRoad.getEnd(), theRoad);
         myRoads.add(theRoad);
-    }
-
-    /**
-     * Adds an intersection to this graph.
-     *
-     * <p>This method does not update the adjacency map; connectivity between
-     * intersections must be established separately.</p>
-     *
-     * @param theIntersection the intersection to add to the graph
-     */
-    public void addIntersection(final Intersection theIntersection) {
-        myIntersections.put(theIntersection.getId(),  theIntersection);
-    }
-
-    /**
-     * Returns the adjacency map, which associates each intersection with the roads
-     * connected to it. The route planner relies on this structure to determine which
-     * roads may be taken from a given intersection.
-     *
-     * <p>The map is built during construction, so every intersection present at that
-     * time has an entry. An intersection or road added afterward is not reflected
-     * until {@link #createAdjacency()} is called again.</p>
-     *
-     * @return the adjacency map
-     */
-    public void createAdjacency() {
-        myAdjacency = new HashMap<Intersection, List<Road>>();
-        for(Intersection i :  myIntersections.values()) {
-            myAdjacency.put(i, new ArrayList<Road>());
-        }
-        for  (Road r : myRoads) {
-            myAdjacency.get(myIntersections.get(r.getStart())).add(r);
-            myAdjacency.get(myIntersections.get(r.getEnd())).add(r);
+        myAdjacency.get(start).add(theRoad);
+        start.addRoad(theRoad);
+        if (!start.equals(end)) {
+            myAdjacency.get(end).add(theRoad);
+            end.addRoad(theRoad);
         }
     }
 
+    /**
+     * Returns the intersection in this graph with the given name, which is one endpoint
+     * of the given road.
+     *
+     * @param theEndpoint the endpoint name taken from theRoad
+     * @param theRoad     the road being added, used in the exception messages
+     * @return the intersection in this graph named theEndpoint
+     * @throws NullPointerException     if theEndpoint is null
+     * @throws IllegalArgumentException if no intersection in this graph is named
+     *                                  theEndpoint
+     */
+    private Intersection requireKnownEndpoint(final String theEndpoint, final Road theRoad) {
+        Objects.requireNonNull(theEndpoint, "endpoint of " + theRoad + " must not be null");
+        Intersection found = null;
+        for (final Intersection intersection : myIntersections) {
+            if (intersection.getName().equals(theEndpoint)) {
+                found = intersection;
+            }
+        }
+        if (found == null) {
+            throw new IllegalArgumentException("endpoint " + theEndpoint + " of "
+                    + theRoad + " is not in the graph; add the intersection first");
+        }
+        return found;
+    }
 
-
-
-
-
+    /**
+     * Returns a short description of this graph, for debugging.
+     *
+     * @return a string giving the number of intersections and roads
+     */
+    @Override
+    public String toString() {
+        return "MapGraph [" + myIntersections.size() + " intersection(s), "
+                + myRoads.size() + " road(s)]";
+    }
 }

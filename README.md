@@ -1,5 +1,20 @@
 # TCSS_360_project
-first Iteration
+
+WHAT THE PROJECT DOES
+A self-driving car route planner. A city map is stored as a graph of
+intersections (nodes) connected by one-way roads (edges). The route
+planner finds the quickest route between two intersections, using each
+road's travel time and skipping blocked roads and intersections. The
+environment simulator changes weather, traffic delay and blocked state,
+and a Swing dashboard draws the map and highlights the planned route.
+
+
+WHO OWNS WHICH CLASSES (from the @author tags)
+- Abdullah Altaae: Road, RoutePlanner, RoadTest, RoutePlannerTest
+- Allia Hussain: EnvironmentSimulator
+- Anjana Virani: CarPlannerApp, PlannerDashboard
+- Felix Kiama: Intersection, MapGraph
+
 Anjana Virani
 
 WHAT I WORKED ON
@@ -40,3 +55,23 @@ Created a basic structure for SafetyChecker and adding necessary methods and fie
 I initially wasn't sure which class should manage traffic conditions and which class should store traffic delays. I worked through the responsibilities and determined that EnvironmentSimulator manages environmental changes while Road stores the numerical traffic delay.
 The Road and Intersection classes were implemented differently than I initially expected. For example, MapGraph stores road IDs rather than Road objects, which required me to reconsider how my simulator interacts with the map.
 This was my first time using YouTrack and Git in IntelliJ, so it took time to learn how to manage tickets, log hours, commit changes, and update my project.
+
+Felix Kiama
+
+WHAT I WORKED ON
+- Intersection (model): a map node identified by name, with equals and
+  hashCode based on the name only. Holds x/y coordinates, a blocked flag
+  and the connected roads. Kept getId(), getX(), getY(), isBlocked() and
+  setBlocked() because RoutePlanner, EnvironmentSimulator and
+  PlannerDashboard use them.
+- MapGraph (model): stores intersections, roads and an adjacency map.
+  addRoad records a road under both endpoints and in both endpoint
+  Intersections (a self-loop is recorded once). getRoute returns the
+  roads leaving an intersection.
+- Input checks: Added NullPointerException and IllegalArgumentException for input saftey.
+- Added full Javadoc on both classes.
+
+ISSUES I HAD
+1. Road stores its start and end as intersection names (Strings), not
+   Intersection objects, so MapGraph looks endpoints up by name.
+2. MapGraph used to store intersections in a Map, while RoutePlanner and EnvironmentSimulator loop over getIntersections() as a list. I changed it to a List, which fixes those two classes but means CarPlannerApp and PlannerDashboard need small updates.
