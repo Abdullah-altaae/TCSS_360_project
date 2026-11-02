@@ -1,4 +1,5 @@
 # TCSS_360_project
+first Iteration
 Anjana Virani
 
 WHAT I WORKED ON
@@ -19,3 +20,11 @@ ISSUES I HAD
    
 3. This was my first time using YouTrack and Git in IntelliJ, so it
    took time to learn them.
+
+Abdullah Altaae
+
+Issues I Had
+1. i found it difficult to see what direction that i needed to go. wasn't sure if i shou[...]
+   worked on the unit code or not, i did what i needed to fullfil 10 hours of work.
+2. there was some changes that needed to be done as we worked compared to the UML versio[...]
+   if changes were not made.
