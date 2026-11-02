@@ -167,7 +167,7 @@ public class PlannerDashboard extends JFrame {
      */
     private JPanel buildInputPanel() {
         final List<String> ids = new ArrayList<>();
-        for (final Intersection intersection : map.getIntersections()) {
+        for (final Intersection intersection : map.getIntersections().values()) {
             ids.add(intersection.getId());
         }
         final String[] idArray = ids.toArray(new String[0]);
@@ -214,7 +214,7 @@ public class PlannerDashboard extends JFrame {
      * @return the matching intersection, or null if none exists
      */
     private Intersection findIntersection(final String theId) {
-        for (final Intersection intersection : map.getIntersections()) {
+        for (final Intersection intersection : map.getIntersections().values()) {
             if (intersection.getId().equals(theId)) {
                 return intersection;
             }
@@ -341,7 +341,7 @@ public class PlannerDashboard extends JFrame {
 
             int maxX = 1;
             int maxY = 1;
-            for (final Intersection i : map.getIntersections()) {
+            for (final Intersection i : map.getIntersections().values()) {
                 maxX = Math.max(maxX, i.getX());
                 maxY = Math.max(maxY, i.getY());
             }
@@ -351,8 +351,7 @@ public class PlannerDashboard extends JFrame {
             // All roads in thin gray (red if blocked), then the route in thick
             // blue on top so two-way roads don't cover the highlight.
             g2.setStroke(new BasicStroke(3));
-            for (final Integer roadId : map.getRoads()) {
-                final Road road = map.getRoad(roadId);
+            for (final Road road : map.getRoads()) {
                 if (road != null) {
                     g2.setColor(road.isBlocked() ? Color.RED : Color.LIGHT_GRAY);
                     drawRoad(g2, road, scale);
@@ -367,7 +366,7 @@ public class PlannerDashboard extends JFrame {
             // Intersections: dark circles, red if blocked, with ID labels.
             g2.setStroke(new BasicStroke(1));
             g2.setFont(getFont().deriveFont(Font.BOLD, 13f));
-            for (final Intersection i : map.getIntersections()) {
+            for (final Intersection i : map.getIntersections().values()) {
                 final int px = toPx(i.getX(), scale);
                 final int py = toPx(i.getY(), scale);
                 g2.setColor(i.isBlocked() ? Color.RED : Color.DARK_GRAY);
