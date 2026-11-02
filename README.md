@@ -16,7 +16,6 @@ ISSUES I HAD
 2. My code used the UML method names, but MapGraph and Road were
    written differently (for example, Road stores intersection IDs
    instead of Intersection objects). I updated my code to match.
-3. My code still needs MapGraph.getRoad() and RoutePlanner, which are
-   planned for Iteration 2.
-4. This was my first time using YouTrack and Git in IntelliJ, so it
+   
+3. This was my first time using YouTrack and Git in IntelliJ, so it
    took time to learn them.
