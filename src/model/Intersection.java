@@ -30,11 +30,11 @@ public final class Intersection {
     private boolean myBlocked;
 
     /** The roads connected to this intersection. */
-    private List<Integer> myConnectedRoads;
+    private List<Road> myConnectedRoads;
 
     /**
      * Constructs an intersection at the specified map position. The intersection is
-     * created with no connected roads; use {@link #addRoad(Integer)} to establish
+     * created with no connected roads; use {@link #addRoad(Road)} to establish
      * connections once the corresponding roads exist.
      *
      * @param theId      the unique identifier for this intersection, for example
@@ -48,7 +48,7 @@ public final class Intersection {
         myX = theX;
         myY = theY;
         myBlocked = theBlocked;
-        myConnectedRoads = new ArrayList<>();
+        myConnectedRoads = new ArrayList<Road>();
     }
 
     /**
@@ -102,7 +102,7 @@ public final class Intersection {
      *
      * @return the list of roads connected to this intersection
      */
-     public List<Integer> getConnectedRoads() {
+     public List<Road> getConnectedRoads() {
         return myConnectedRoads;
      }
 
@@ -126,7 +126,7 @@ public final class Intersection {
      *
      * @param theConnectedRoads the new list of connected roads
      */
-     public void setConnectedRoads(final List<Integer> theConnectedRoads) {
+     public void setConnectedRoads(final List<Road> theConnectedRoads) {
         myConnectedRoads = theConnectedRoads;
      }
 
@@ -136,7 +136,7 @@ public final class Intersection {
      *
      * @param theRoad the road to connect to this intersection
      */
-     public void addRoad(final Integer theRoad) {
+     public void addRoad(final Road theRoad) {
         myConnectedRoads.add(theRoad);
      }
 

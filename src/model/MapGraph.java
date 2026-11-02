@@ -1,4 +1,6 @@
 package model;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 
@@ -17,14 +19,14 @@ import java.util.List;
 public final class MapGraph {
 
 
-    /** The intersections forming the nodes of this graph. */
-    private final List<Intersection> myIntersections;
+    /** The intersections forming the nodes of this graph.Each ID paired with the object.*/
+    private final Map<String, Intersection> myIntersections;
 
     /** The roads forming the edges of this graph. */
-    private final List<Integer> myRoads;
+    private final List<Road> myRoads;
 
     /** The roads reachable from each intersection. */
-    private Map<Intersection, List<Integer>> myAdjacency;
+    private Map<Intersection, List<Road>> myAdjacency;
 
     /**
      * Constructs a map graph from the supplied intersections and roads.
@@ -35,21 +37,22 @@ public final class MapGraph {
      * @param theIntersections the intersections forming the nodes of the graph
      * @param theRoads         the roads forming the edges of the graph
      */
-    public MapGraph(final List<Intersection> theIntersections, final List<Integer> theRoads) {
+    public MapGraph(final Map<String, Intersection> theIntersections, final List<Road> theRoads) {
         myIntersections = theIntersections;
         myRoads = theRoads;
+        createAdjacency();
     }
 
     /**
      * Returns the intersections contained in this graph.
      *
-     * <p>This method returns a direct reference to the internal list rather than a
+     * <p>This method returns a direct reference to the internal Map rather than a
      * defensive copy. Modifications made to the returned list are reflected in this
      * graph.</p>
      *
-     * @return the list of intersections in this graph
+     * @return the Map of intersections in this graph
      */
-    public List<Intersection> getIntersections() {
+    public Map<String, Intersection> getIntersections() {
         return myIntersections;
     }
 
@@ -62,9 +65,11 @@ public final class MapGraph {
      *
      * @return the list of roads in this graph
      */
-    public List<Integer> getRoads() {
+    public List<Road> getRoads() {
         return myRoads;
     }
+
+
 
     /**
      * Returns the number of intersections currently in this graph.
@@ -85,25 +90,20 @@ public final class MapGraph {
      *
      * @return the adjacency map, or {@code null} if it has not been initialized
      */
-    public Map<Intersection, List<Integer>> getAdjacency() {
+    public Map<Intersection, List<Road>> getAdjacency() {
         return myAdjacency;
     }
 
     /**
      * Determines whether this graph contains an intersection with the given identifier.
-     * The search is performed as a linear scan over the intersection list.
+     * The search is performed checking if the passed ID exists in te.
      *
      * @param theName the identifier to search for
      * @return {@code true} if a matching intersection exists in this graph,
      *         {@code false} otherwise
      */
     public boolean containsIntersection(final String theName) {
-        for (Intersection i : myIntersections) {
-            if (i.getId().equals(theName)) {
-                return true;
-            }
-        }
-        return false;
+        return myIntersections.get(theName) != null;
     }
 
     /**
@@ -114,7 +114,7 @@ public final class MapGraph {
      *
      * @param theRoad the road to add to the graph
      */
-    public void addRoad(final int theRoad) {
+    public void addRoad(final Road theRoad) {
         myRoads.add(theRoad);
     }
 
@@ -127,10 +127,30 @@ public final class MapGraph {
      * @param theIntersection the intersection to add to the graph
      */
     public void addIntersection(final Intersection theIntersection) {
-        myIntersections.add(theIntersection);
+        myIntersections.put(theIntersection.getId(),  theIntersection);
     }
 
-    //Will add method for establishing and updating Adjacency
+    /**
+     * Returns the adjacency map, which associates each intersection with the roads
+     * connected to it. The route planner relies on this structure to determine which
+     * roads may be taken from a given intersection.
+     *
+     * <p>The map is built during construction, so every intersection present at that
+     * time has an entry. An intersection or road added afterward is not reflected
+     * until {@link #createAdjacency()} is called again.</p>
+     *
+     * @return the adjacency map
+     */
+    public void createAdjacency() {
+        myAdjacency = new HashMap<Intersection, List<Road>>();
+        for(Intersection i :  myIntersections.values()) {
+            myAdjacency.put(i, new ArrayList<Road>());
+        }
+        for  (Road r : myRoads) {
+            myAdjacency.get(myIntersections.get(r.getStart())).add(r);
+            myAdjacency.get(myIntersections.get(r.getEnd())).add(r);
+        }
+    }
 
 
 

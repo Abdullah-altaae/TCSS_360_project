@@ -1,6 +1,7 @@
 package controller;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 import javax.swing.SwingUtilities;
 
@@ -47,15 +48,15 @@ public final class CarPlannerApp {
      * @return the sample map
      */
     private static MapGraph buildSampleMap() {
-        final MapGraph map = new MapGraph(new ArrayList<>(), new ArrayList<>());
+        final MapGraph map = new MapGraph(new HashMap<>(), new ArrayList<>());
 
-        map.addIntersection(new Intersection("A", 0, 0));
-        map.addIntersection(new Intersection("B", 200, 0));
-        map.addIntersection(new Intersection("C", 400, 0));
-        map.addIntersection(new Intersection("D", 0, 200));
-        map.addIntersection(new Intersection("E", 200, 200));
-        map.addIntersection(new Intersection("F", 400, 200));
-        map.addIntersection(new Intersection("G", 600, 100));
+        map.addIntersection(new Intersection("A", 0, 0, false));
+        map.addIntersection(new Intersection("B", 200, 0, false));
+        map.addIntersection(new Intersection("C", 400, 0, false));
+        map.addIntersection(new Intersection("D", 0, 200, false));
+        map.addIntersection(new Intersection("E", 200, 200, false));
+        map.addIntersection(new Intersection("F", 400, 200, false));
+        map.addIntersection(new Intersection("G", 600, 100, false));
 
         addTwoWayRoad(map, "A", "B", 2.0, 35);
         addTwoWayRoad(map, "B", "C", 2.0, 35);
