@@ -35,7 +35,7 @@ public final class CarPlannerApp {
      */
     public static void main(final String[] theArgs) {
         final MapGraph map = buildSampleMap();
-        final RoutePlanner planner = new RoutePlanner(map);
+        final RoutePlanner planner = new RoutePlanner(map, map.getRoads());
 
         SwingUtilities.invokeLater(() -> new PlannerDashboard(map, planner).setVisible(true));
     }
@@ -48,7 +48,7 @@ public final class CarPlannerApp {
      * @return the sample map
      */
     private static MapGraph buildSampleMap() {
-        final MapGraph map = new MapGraph(new HashMap<>(), new ArrayList<>());
+        final MapGraph map = new MapGraph(new ArrayList<>(), new ArrayList<>());
 
         map.addIntersection(new Intersection("A", 0, 0, false));
         map.addIntersection(new Intersection("B", 200, 0, false));
