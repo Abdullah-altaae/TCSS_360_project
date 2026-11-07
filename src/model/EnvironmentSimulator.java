@@ -2,6 +2,8 @@ package model;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Simulates environmental conditions that may affect route planning,
@@ -32,6 +34,9 @@ public class EnvironmentSimulator {
     /** The map graph containing the intersections and roads in the simulation. */
     private final MapGraph myMapGraph;
 
+    /** Stores the traffic intensity of each road. */
+    private final Map<Road, Double> myTrafficIntensities;
+
     /**
      * Constructs an EnvironmentSimulator with clear weather,
      * normal traffic, and no blocked roads.
@@ -41,6 +46,7 @@ public class EnvironmentSimulator {
     public EnvironmentSimulator(MapGraph theGraph) {
         myMapGraph = theGraph;
         myWeather = WeatherCondition.CLEAR;
+        myTrafficIntensities = new HashMap<>();
     }
     /**
      * Returns the current weather condition.
@@ -149,5 +155,31 @@ public class EnvironmentSimulator {
             }
         }
         return list;
+    }
+
+    /**
+     * Sets the traffic intensity for a specific road.
+     *
+     * @param theRoad the road receiving the traffic intensity
+     * @param theIntensity the traffic intensity, from 0.0 to 1.0
+     */
+    public void setTrafficIntensity(Road theRoad, double theIntensity) {
+        if (theIntensity < 0.0 || theIntensity > 1.0) {
+            throw new IllegalArgumentException("Traffic intensity must be between 0.0 and 1.0.");
+        }
+        if (theRoad == null) {
+            throw new IllegalArgumentException("Road cannot be null.");
+        }
+        myTrafficIntensities.put(theRoad, theIntensity);
+    }
+
+    /**
+     * Gets the traffic intensity assigned to a specific road.
+     *
+     * @param theRoad the specific road
+     * @return the traffic intensity, or 0.0 if none has been assigned
+     */
+    public double getTrafficIntensity(Road theRoad) {
+        return myTrafficIntensities.getOrDefault(theRoad, 0.0);
     }
 }
