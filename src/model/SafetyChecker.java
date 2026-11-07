@@ -127,12 +127,19 @@ public class SafetyChecker {
      *
      * @return true if the weather risk factor is at least 0.5, false otherwise
      */
-    public boolean checkEnvironmentalRisk() {
+    public boolean checkEnvironmentalRisk(List<Road> theRoute) {
         EnvironmentSimulator.WeatherCondition weather = myEnvironmentSimulator.getWeather();
         double riskFactor = weather.getRiskFactor();
 
         if (riskFactor >= 0.5) {
             return true;
+        }
+
+        for (Road road : theRoute) {
+            double intensity = myEnvironmentSimulator.getTrafficIntensity(road);
+            if (intensity >= 0.7) {
+                return true;
+            }
         }
         return false;
     }
@@ -181,7 +188,7 @@ public class SafetyChecker {
 
         safetyRating -= sharpTurns.size() * 15;
 
-        if (checkEnvironmentalRisk()) {
+        if (checkEnvironmentalRisk(theRoute)) {
             safetyRating -= 20;
         }
 
