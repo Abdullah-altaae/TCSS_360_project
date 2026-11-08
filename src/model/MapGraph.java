@@ -104,9 +104,8 @@ public final class MapGraph {
      *                                  this graph, or if either endpoint is not in this
      *                                  graph
      */
-    public List<Road> addRoad(final Road theRoad) {
+    public void addRoad(final Road theRoad) {
         insertRoad(theRoad);
-        return getRoads();
     }
 
     /**

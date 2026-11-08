@@ -45,7 +45,7 @@ public final class CarPlannerApp {
      * @return the sample map
      */
     private static MapGraph buildSampleMap() {
-        final MapGraph map = new MapGraph();
+        final MapGraph map = new MapGraph(new ArrayList<>(), new ArrayList<>());
 
         map.addIntersection(new Intersection("A", 0, 0, false));
         map.addIntersection(new Intersection("B", 200, 0, false));
