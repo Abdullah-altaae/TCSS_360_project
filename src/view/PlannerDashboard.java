@@ -167,7 +167,7 @@ public class PlannerDashboard extends JFrame {
      */
     private JPanel buildInputPanel() {
         final List<String> ids = new ArrayList<>();
-        for (final Intersection intersection : map.getIntersections().values()) {
+        for (final Intersection intersection : map.getIntersections()) {
             ids.add(intersection.getId());
         }
         final String[] idArray = ids.toArray(new String[0]);
@@ -214,7 +214,7 @@ public class PlannerDashboard extends JFrame {
      * @return the matching intersection, or null if none exists
      */
     private Intersection findIntersection(final String theId) {
-        for (final Intersection intersection : map.getIntersections().values()) {
+        for (final Intersection intersection : map.getIntersections()) {
             if (intersection.getId().equals(theId)) {
                 return intersection;
             }
@@ -341,7 +341,7 @@ public class PlannerDashboard extends JFrame {
 
             int maxX = 1;
             int maxY = 1;
-            for (final Intersection i : map.getIntersections().values()) {
+            for (final Intersection i : map.getIntersections()) {
                 maxX = Math.max(maxX, i.getX());
                 maxY = Math.max(maxY, i.getY());
             }
@@ -366,7 +366,7 @@ public class PlannerDashboard extends JFrame {
             // Intersections: dark circles, red if blocked, with ID labels.
             g2.setStroke(new BasicStroke(1));
             g2.setFont(getFont().deriveFont(Font.BOLD, 13f));
-            for (final Intersection i : map.getIntersections().values()) {
+            for (final Intersection i : map.getIntersections()) {
                 final int px = toPx(i.getX(), scale);
                 final int py = toPx(i.getY(), scale);
                 g2.setColor(i.isBlocked() ? Color.RED : Color.DARK_GRAY);
