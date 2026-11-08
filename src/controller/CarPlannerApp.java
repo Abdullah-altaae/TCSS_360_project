@@ -1,8 +1,5 @@
 package controller;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-
 import javax.swing.SwingUtilities;
 
 import model.Intersection;
@@ -19,7 +16,7 @@ import view.PlannerDashboard;
  * </p>
  *
  * @author Anjana Virani
- * @version 1 November 2026
+ * @version 4 November 2026
  */
 public final class CarPlannerApp {
 
@@ -35,7 +32,7 @@ public final class CarPlannerApp {
      */
     public static void main(final String[] theArgs) {
         final MapGraph map = buildSampleMap();
-        final RoutePlanner planner = new RoutePlanner(map);
+        final RoutePlanner planner = new RoutePlanner(map, map.getRoads());
 
         SwingUtilities.invokeLater(() -> new PlannerDashboard(map, planner).setVisible(true));
     }
@@ -48,7 +45,7 @@ public final class CarPlannerApp {
      * @return the sample map
      */
     private static MapGraph buildSampleMap() {
-        final MapGraph map = new MapGraph(new HashMap<>(), new ArrayList<>());
+        final MapGraph map = new MapGraph();
 
         map.addIntersection(new Intersection("A", 0, 0, false));
         map.addIntersection(new Intersection("B", 200, 0, false));
@@ -74,10 +71,11 @@ public final class CarPlannerApp {
     /**
      * Adds a road in both directions so cars can travel either way.
      * Each direction is a separate one-way {@link Road} with its own ID.
+     * Both intersections must already be on the map.
      *
      * @param theMap the map to add to
-     * @param theFrom the ID of one end of the road
-     * @param theTo the ID of the other end of the road
+     * @param theFrom the name of one end of the road
+     * @param theTo the name of the other end of the road
      * @param theDistance length of the road in miles
      * @param theSpeedLimit speed limit in mph
      */
