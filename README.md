@@ -75,3 +75,28 @@ ISSUES I HAD
 1. Road stores its start and end as intersection names (Strings), not
    Intersection objects, so MapGraph looks endpoints up by name.
 2. MapGraph used to store intersections in a Map, while RoutePlanner and EnvironmentSimulator loop over getIntersections() as a list. I changed it to a List, which fixes those two classes but means CarPlannerApp and PlannerDashboard need small updates.
+
+
+Iteration 2 (Due: November 8, 2026)
+
+Anjana Virani
+
+WHAT I WORKED ON
+- PlannerController (controller): new class that connects the GUI to the
+  model so the program follows MVC. It checks the route input, asks the
+  RoutePlanner for a route, and tells the dashboard what to show. It also
+  passes simulation changes (weather, traffic, blocked roads and
+  intersections) to the EnvironmentSimulator and re-plans the route.
+- SimulationPanel (view): new control panel on the dashboard for choosing
+  the weather, blocking/unblocking intersections and roads, setting
+  traffic delays, and resetting all conditions.
+
+ISSUES I HAD
+1. Teammates changed the MapGraph, Intersection and RoutePlanner
+   constructors, so my code stopped compiling. I updated my code to
+   match the new versions.
+2. When I opened a pull request to merge my branch into main, there was
+   a merge conflict in CarPlannerApp. I tried to resolve it and updated the file.
+3. Re-routing around blocked roads depends on RoutePlanner skipping
+   blocked roads and intersections, which needs to be confirmed with
+   the team.
