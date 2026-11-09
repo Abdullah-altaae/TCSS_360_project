@@ -47,22 +47,30 @@ Issues I Had
 Allia hussain
 
 Week 1:
-1. EnvironmentSimulator (model): implemented environmental conditions, including clear, rainy, and snowy weather, with associated risk factors.
-Implemented weather-adjusted road speeds and travel time calculations.
-Implemented traffic delay updates for individual roads.
+1. What I worked on:
+EnvironmentSimulator (model): implemented environmental conditions, including clear, rainy,
+and snowy weather, with associated risk factors. Implemented weather-adjusted road speeds and
+travel time calculations. Implemented traffic delay updates for individual roads.
 Created a basic structure for SafetyChecker and adding necessary methods and fields.
 
+3. Issues I had:
+I initially wasn't sure which class should manage traffic conditions and which class should
+store traffic delays. I worked through the responsibilities and determined that EnvironmentSimulator
+manages environmental changes while Road stores the numerical traffic delay. The Road and Intersection
+classes were implemented differently than I initially expected. For example, MapGraph stores road IDs rather
+than Road objects, which required me to reconsider how my simulator interacts with the map. This was my first
+time using YouTrack and Git in IntelliJ, so it took time to learn how to manage tickets, log hours, commit changes,
+and update my project.
+
 Week 2:
-1. Implemented traffic intensity tracking for individual roads using a numerical scale from 0.0 to 1.0.
-2. Implemented the entirety of SafetyChecker class to account for weather and traffic conditions.
-3. Implemented environmental safety penalties based on weather and traffic intensity.
-4. Implemented sharp-turn detection using vector calculations.
+1. What I worked on:
+Implemented traffic intensity tracking for individual roads using a numerical scale from 0.0 to 1.0.
+Implemented the entirety of SafetyChecker class to account for weather and traffic conditions.
+Implemented environmental safety penalties based on weather and traffic intensity.
+Implemented sharp-turn detection using vector calculations.
 
+No such Issues this week!
 
-5. Issues I had:
-I initially wasn't sure which class should manage traffic conditions and which class should store traffic delays. I worked through the responsibilities and determined that EnvironmentSimulator manages environmental changes while Road stores the numerical traffic delay.
-The Road and Intersection classes were implemented differently than I initially expected. For example, MapGraph stores road IDs rather than Road objects, which required me to reconsider how my simulator interacts with the map.
-This was my first time using YouTrack and Git in IntelliJ, so it took time to learn how to manage tickets, log hours, commit changes, and update my project.
 
 Felix Kiama
 
