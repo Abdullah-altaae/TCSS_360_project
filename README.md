@@ -72,6 +72,9 @@ Implemented sharp-turn detection using vector calculations.
 No such Issues this week!
 
 
+
+
+
 Felix Kiama
 
 WHAT I WORKED ON
@@ -91,6 +94,40 @@ ISSUES I HAD
 1. Road stores its start and end as intersection names (Strings), not
    Intersection objects, so MapGraph looks endpoints up by name.
 2. MapGraph used to store intersections in a Map, while RoutePlanner and EnvironmentSimulator loop over getIntersections() as a list. I changed it to a List, which fixes those two classes but means CarPlannerApp and PlannerDashboard need small updates.
+
+Week 2/Iteration 2
+
+WHAT I WORKED ON
+- Intersection and MapGraph (model): met with the team to plan how both
+  classes should change to act as true model classes. Updated the input
+  exceptions and Javadoc on both. addRoad in MapGraph no longer returns a
+  list, and I improved the error checking in the class.
+- RouteDatabase (model): researched options and chose SQLite, then set it
+  up in the IntelliJ project. Built a 3-table structure (routes,
+  simulation_runs, hazards) with methods to insert, update, load and
+  delete data. Each simulation run belongs to a route, and each hazard
+  belongs to a simulation run.
+- DataBaseSandBox: a mock driver to test the database. Used DB Browser
+  to check inserting, updating, reading and deleting, and that exceptions
+  are thrown and handled correctly.
+- Route (model): proposed Route, SimulationRun and Hazard classes to the
+  team as a better way to organize our results, and planned their fields
+  and methods. Implemented Route, which stores a route's ID, start, end,
+  roads in travel order, total distance and a string of its road IDs.
+  Added placeholder code for pending features and connected it to the
+  database to generate IDs.
+- Added full Javadoc on the database class, the driver and Route.
+
+ISSUES I HAD
+1. I had two GitHub accounts set up on my computer, and they got mixed
+   up. Git kept logging in with the account that didn't have access to
+   the repo, so it wouldn't let me push my work until I fixed it.
+2. I struggled to find the right place for the insert calls for routes
+   and the other saved objects. The database generates the IDs, so the
+   insert has to happen somewhere that can pass the generated IDs to the
+   Route, SimulationRun and Hazard constructors.
+
+
 
 
 Abdullah Altaae 
