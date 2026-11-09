@@ -14,6 +14,11 @@ import java.util.Map;
  * @version 31 October 2026
  */
 public class EnvironmentSimulator {
+
+    /**
+     * Represents the weather conditions used in the environment simulation.
+     * Each condition has an associated environmental risk factor.
+     */
     public enum WeatherCondition {
         CLEAR(0.0),
         RAINY(0.2),
@@ -29,6 +34,10 @@ public class EnvironmentSimulator {
         }
     }
 
+    /**
+     * Represents the traffic intensity categories used to describe road conditions.
+     * Traffic levels are determined by each road's numerical traffic intensity.
+     */
     public enum TrafficLevel {
         LIGHT,
         MODERATE,

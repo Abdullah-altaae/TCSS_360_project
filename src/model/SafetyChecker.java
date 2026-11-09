@@ -12,7 +12,10 @@ import java.util.List;
  * @version 2 November 2026
  */
 public class SafetyChecker {
+    /** The environment simulator used to access current weather and traffic conditions. */
     private final EnvironmentSimulator myEnvironmentSimulator;
+
+    /** The map graph containing the intersections and roads in the simulation. */
     private final MapGraph myMapGraph;
 
     /**
