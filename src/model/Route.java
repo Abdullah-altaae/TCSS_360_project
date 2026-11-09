@@ -55,8 +55,6 @@ public class Route {
         myPathString = createPathString();
     }
 
-
-
     /**
      * Adds up the lengths of all roads in this route's path.
      *
