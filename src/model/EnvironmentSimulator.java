@@ -28,6 +28,13 @@ public class EnvironmentSimulator {
             return myRiskFactor;
         }
     }
+
+    public enum TrafficLevel {
+        LIGHT,
+        MODERATE,
+        HEAVY
+    }
+
     /** The current weather condition in the simulation. */
     private WeatherCondition myWeather;
 
@@ -155,6 +162,39 @@ public class EnvironmentSimulator {
             }
         }
         return list;
+    }
+
+    /**
+     * Gets all blocked roads in the map graph.
+     *
+     * @return a list of roads that are currently blocked
+     */
+    public List<Road> getBlockedRoads() {
+        List<Road> list = new ArrayList<>();
+        for (Road road : myMapGraph.getRoads()) {
+            if(road.isBlocked()) {
+                list.add(road);
+            }
+        }
+        return list;
+    }
+
+    /**
+     * Gets the traffic category for a specific road.
+     *
+     * @param theRoad the road being checked
+     * @return the traffic category based on its intensity
+     */
+    public TrafficLevel getTrafficLevel(Road theRoad) {
+        double intensity = getTrafficIntensity(theRoad);
+
+        if (intensity >= 0.7) {
+            return TrafficLevel.HEAVY;
+        } else if (intensity >= 0.3) {
+            return TrafficLevel.MODERATE;
+        } else {
+            return TrafficLevel.LIGHT;
+        }
     }
 
     /**
