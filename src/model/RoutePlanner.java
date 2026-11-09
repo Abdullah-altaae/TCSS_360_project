@@ -7,46 +7,80 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
 
 /**
  * Plans routes between intersections using Dijkstra's algorithm. Roads are
  * weighted by travel time, so the planner picks the quickest route, which
  * might not be the shortest one.
  *
+ * <p>With an {@link EnvironmentSimulator}, travel times are adjusted for weather.</p>
+ *
  * <p>Blocked roads and intersections are skipped. The planner checks the current
  * state of the map every time findRoute is called, so new traffic or blocked
  * roads are always taken into account.</p>
  *
  * @author Abdullah Altaae
- * @version 1 November 2026
+ * @version 8 November 2026
  */
 public final class RoutePlanner {
 
-    /** The map to plan routes on. */
+    /** The map to plan routes on. Roads are read from it on every call. */
     private final MapGraph myGraph;
 
-    /** The roads that can be used in a route. */
-    private final List<Road> myRoads;
+    /** Adjusts travel times for weather, or null if not set. */
+    private EnvironmentSimulator mySimulator;
 
     /**
-     * Creates a route planner for a map and its roads.
+     * Creates a route planner for a map. The planner always uses the map's
+     * current roads, so roads added later are included in new routes.
      *
      * @param theGraph the map
-     * @param theRoads the roads on the map
-     * @throws IllegalArgumentException if theGraph or theRoads is null, or if
-     *                                  any road is null
+     * @throws IllegalArgumentException if theGraph is null
      */
-    public RoutePlanner(final MapGraph theGraph, final Collection<Road> theRoads) {
-        if (theGraph == null || theRoads == null) {
-            throw new IllegalArgumentException("graph and roads must not be null");
-        }
-        for (final Road road : theRoads) {
-            if (road == null) {
-                throw new IllegalArgumentException("roads must not contain null");
-            }
+    public RoutePlanner(final MapGraph theGraph) {
+        if (theGraph == null) {
+            throw new IllegalArgumentException("graph must not be null");
         }
         myGraph = theGraph;
-        myRoads = new ArrayList<>(theRoads);
+    }
+
+    /**
+     * Creates a route planner that accounts for weather.
+     *
+     * @param theGraph     the map
+     * @param theSimulator the environment simulator
+     * @throws IllegalArgumentException if theGraph or theSimulator is null
+     */
+    public RoutePlanner(final MapGraph theGraph, final EnvironmentSimulator theSimulator) {
+        this(theGraph);
+        setSimulator(theSimulator);
+    }
+
+    /**
+     * Sets the simulator used to adjust travel times for weather.
+     *
+     * @param theSimulator the environment simulator
+     * @throws IllegalArgumentException if theSimulator is null
+     */
+    public void setSimulator(final EnvironmentSimulator theSimulator) {
+        if (theSimulator == null) {
+            throw new IllegalArgumentException("simulator must not be null");
+        }
+        mySimulator = theSimulator;
+    }
+
+    /**
+     * Returns a road's travel time, adjusted for weather if a simulator is set.
+     *
+     * @param theRoad the road
+     * @return the travel time, in hours
+     */
+    public double getTravelTime(final Road theRoad) {
+        if (mySimulator == null) {
+            return theRoad.getTravelTime();
+        }
+        return mySimulator.calculateAdjustedTravelTime(theRoad);
     }
 
     /**
@@ -65,6 +99,61 @@ public final class RoutePlanner {
         if (theStart == null || theEnd == null) {
             throw new IllegalArgumentException("start and end must not be null");
         }
+        return findRoute(theStart, theEnd, Collections.emptySet());
+    }
+
+    /**
+     * Finds up to theCount different routes from theStart to theEnd, fastest first.
+     * The first route is the same one findRoute returns.
+     *
+     * @param theStart the starting intersection
+     * @param theEnd   the destination intersection
+     * @param theCount the most routes to return
+     * @return the routes, fastest first, or an empty list if there is no route
+     * @throws IllegalArgumentException if theStart or theEnd is null, or theCount
+     *                                  is less than 1
+     */
+    public List<List<Road>> findAlternativeRoutes(final Intersection theStart,final Intersection theEnd, final int theCount) {
+        if (theCount < 1) {
+            throw new IllegalArgumentException("count must be at least 1, was " + theCount);
+        }
+        final List<Road> best = findRoute(theStart, theEnd);
+        final List<List<Road>> routes = new ArrayList<>();
+        if (best.isEmpty()) {
+            return routes;
+        }
+        routes.add(best);
+
+        // Skip one road of the best route at a time to find different routes.
+        final List<List<Road>> candidates = new ArrayList<>();
+        for (final Road road : best) {
+            final List<Road> detour = findRoute(theStart, theEnd, Set.of(road));
+            if (!detour.isEmpty() && !candidates.contains(detour)) {
+                candidates.add(detour);
+            }
+        }
+        candidates.sort((theA, theB) ->
+                Double.compare(getSimulatedTime(theA), getSimulatedTime(theB)));
+
+        for (final List<Road> candidate : candidates) {
+            if (routes.size() == theCount) {
+                break;
+            }
+            routes.add(candidate);
+        }
+        return routes;
+    }
+
+    /**
+     * Finds the quickest route that does not use any of the excluded roads.
+     *
+     * @param theStart    the starting intersection
+     * @param theEnd      the destination intersection
+     * @param theExcluded roads the route must not use
+     * @return the roads to take, in order, or an empty list if there is no route
+     */
+    private List<Road> findRoute(final Intersection theStart, final Intersection theEnd,
+                                 final Set<Road> theExcluded) {
         final Map<String, Intersection> intersections = indexIntersections();
         final String startId = theStart.getId();
         final String endId = theEnd.getId();
@@ -92,10 +181,11 @@ public final class RoutePlanner {
             for (final Road road : outgoing.getOrDefault(current.myId,
                     Collections.emptyList())) {
                 final Intersection next = intersections.get(road.getEnd());
-                if (road.isBlocked() || next == null || next.isBlocked()) {
+                if (road.isBlocked() || theExcluded.contains(road)
+                        || next == null || next.isBlocked()) {
                     continue;
                 }
-                final double time = current.myTime + road.getTravelTime();
+                final double time = current.myTime + getTravelTime(road);
                 final Double known = bestTime.get(next.getId());
                 if (known == null || time < known) {
                     bestTime.put(next.getId(), time);
@@ -106,6 +196,66 @@ public final class RoutePlanner {
         }
 
         return buildPath(previousRoad, startId, endId);
+    }
+
+    /**
+     * Returns the total distance of a route.
+     *
+     * @param theRoute the roads in the route
+     * @return the total distance, in miles
+     * @throws IllegalArgumentException if theRoute is null
+     */
+    public double getRouteDistance(final List<Road> theRoute) {
+        requireRoute(theRoute);
+        double total = 0;
+        for (final Road road : theRoute) {
+            total += road.getDistance();
+        }
+        return total;
+    }
+
+    /**
+     * Returns a route's travel time at the speed limits with no weather or traffic.
+     *
+     * @param theRoute the roads in the route
+     * @return the normal travel time, in hours
+     * @throws IllegalArgumentException if theRoute is null
+     */
+    public double getNormalTime(final List<Road> theRoute) {
+        requireRoute(theRoute);
+        double total = 0;
+        for (final Road road : theRoute) {
+            total += road.getDistance() / road.getSpeedLimit();
+        }
+        return total;
+    }
+
+    /**
+     * Returns a route's travel time under current weather and traffic.
+     *
+     * @param theRoute the roads in the route
+     * @return the simulated travel time, in hours
+     * @throws IllegalArgumentException if theRoute is null
+     */
+    public double getSimulatedTime(final List<Road> theRoute) {
+        requireRoute(theRoute);
+        double total = 0;
+        for (final Road road : theRoute) {
+            total += getTravelTime(road);
+        }
+        return total;
+    }
+
+    /**
+     * Checks that a route is not null.
+     *
+     * @param theRoute the route to check
+     * @throws IllegalArgumentException if theRoute is null
+     */
+    private static void requireRoute(final List<Road> theRoute) {
+        if (theRoute == null) {
+            throw new IllegalArgumentException("route must not be null");
+        }
     }
 
     /**
@@ -154,7 +304,7 @@ public final class RoutePlanner {
      */
     private Map<String, List<Road>> indexOutgoingRoads() {
         final Map<String, List<Road>> index = new HashMap<>();
-        for (final Road road : myRoads) {
+        for (final Road road : myGraph.getRoads()) {
             index.computeIfAbsent(road.getStart(), key -> new ArrayList<>()).add(road);
         }
         return index;

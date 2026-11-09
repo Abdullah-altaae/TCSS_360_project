@@ -11,7 +11,7 @@ and a Swing dashboard draws the map and highlights the planned route.
 
 WHO OWNS WHICH CLASSES (from the @author tags)
 - Abdullah Altaae: Road, RoutePlanner, RoadTest, RoutePlannerTest
-- Allia Hussain: EnvironmentSimulator
+- Allia Hussain: EnvironmentSimulator, SafetyChecker, SafetyRating
 - Anjana Virani: CarPlannerApp, PlannerDashboard
 - Felix Kiama: Intersection, MapGraph
 
@@ -46,15 +46,31 @@ Issues I Had
 
 Allia hussain
 
-1. EnvironmentSimulator (model): implemented environmental conditions, including clear, rainy, and snowy weather, with associated risk factors.
-Implemented weather-adjusted road speeds and travel time calculations.
-Implemented traffic delay updates for individual roads.
+Week 1:
+1. What I worked on:
+EnvironmentSimulator (model): implemented environmental conditions, including clear, rainy,
+and snowy weather, with associated risk factors. Implemented weather-adjusted road speeds and
+travel time calculations. Implemented traffic delay updates for individual roads.
 Created a basic structure for SafetyChecker and adding necessary methods and fields.
 
-2. Issues I had:
-I initially wasn't sure which class should manage traffic conditions and which class should store traffic delays. I worked through the responsibilities and determined that EnvironmentSimulator manages environmental changes while Road stores the numerical traffic delay.
-The Road and Intersection classes were implemented differently than I initially expected. For example, MapGraph stores road IDs rather than Road objects, which required me to reconsider how my simulator interacts with the map.
-This was my first time using YouTrack and Git in IntelliJ, so it took time to learn how to manage tickets, log hours, commit changes, and update my project.
+3. Issues I had:
+I initially wasn't sure which class should manage traffic conditions and which class should
+store traffic delays. I worked through the responsibilities and determined that EnvironmentSimulator
+manages environmental changes while Road stores the numerical traffic delay. The Road and Intersection
+classes were implemented differently than I initially expected. For example, MapGraph stores road IDs rather
+than Road objects, which required me to reconsider how my simulator interacts with the map. This was my first
+time using YouTrack and Git in IntelliJ, so it took time to learn how to manage tickets, log hours, commit changes,
+and update my project.
+
+Week 2:
+1. What I worked on:
+Implemented traffic intensity tracking for individual roads using a numerical scale from 0.0 to 1.0.
+Implemented the entirety of SafetyChecker class to account for weather and traffic conditions.
+Implemented environmental safety penalties based on weather and traffic intensity.
+Implemented sharp-turn detection using vector calculations.
+
+No such Issues this week!
+
 
 Felix Kiama
 
@@ -75,3 +91,30 @@ ISSUES I HAD
 1. Road stores its start and end as intersection names (Strings), not
    Intersection objects, so MapGraph looks endpoints up by name.
 2. MapGraph used to store intersections in a Map, while RoutePlanner and EnvironmentSimulator loop over getIntersections() as a list. I changed it to a List, which fixes those two classes but means CarPlannerApp and PlannerDashboard need small updates.
+
+
+Abdullah Altaae 
+what i worked on 
+1 road 
+- One-way road between two intersections with distance (miles), speed limit (mph), traffic delay (hours) and a blocked flag
+- Input validation for IDs, endpoints, distance, speed and traffic delay
+- Travel time at the speed limit or at a given (weather-adjusted) speed, including traffic delay
+- `equals()` / `hashCode()` based on road ID, so roads work correctly as map keys and in lists
+2 RoutePlanner
+- Finds the quickest route between two intersections using Dijkstra's algorithm, weighted by travel time
+- Skips blocked roads and blocked intersections
+- Reads roads from the map on every call, so newly added roads, traffic and blockages are always used
+- added Weather-aware routing
+- added Alternative routes
+- Route comparison
+3 GeoProjection
+- Converts latitude/longitude to x/y map coordinates using Web Mercator, the projection OpenStreetMap tiles use
+- set (0, 0) is the top left corner of the map area
+- `distanceMiles()` computes the distance between two coordinates (haversine formula)
+4 OpenStreetMap research
+- Researched the OSM data format (nodes, ways, tags), the Overpass API and tile usage rules
+- Exported a downtown Seattle map (`.osm`) to use as the real-world map
+
+ISSUES I HAD
+i had trouble getting the API working i did most of the time looking at the API and trying to understand how it works
+i worked on GeoProject but didnt create any test, will still need to be worked on next week to finish.

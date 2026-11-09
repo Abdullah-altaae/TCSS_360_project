@@ -44,7 +44,7 @@ import model.RoutePlanner;
  * </p>
  *
  * @author Anjana Virani
- * @version 1 November 2026
+ * @version 4 November 2026
  */
 public class PlannerDashboard extends JFrame {
 
@@ -352,10 +352,8 @@ public class PlannerDashboard extends JFrame {
             // blue on top so two-way roads don't cover the highlight.
             g2.setStroke(new BasicStroke(3));
             for (final Road road : map.getRoads()) {
-                if (road != null) {
-                    g2.setColor(road.isBlocked() ? Color.RED : Color.LIGHT_GRAY);
-                    drawRoad(g2, road, scale);
-                }
+                g2.setColor(road.isBlocked() ? Color.RED : Color.LIGHT_GRAY);
+                drawRoad(g2, road, scale);
             }
             g2.setColor(ROUTE_COLOR);
             g2.setStroke(new BasicStroke(6));

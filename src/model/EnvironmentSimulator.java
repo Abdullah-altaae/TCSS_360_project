@@ -2,6 +2,8 @@ package model;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Simulates environmental conditions that may affect route planning,
@@ -12,6 +14,11 @@ import java.util.List;
  * @version 31 October 2026
  */
 public class EnvironmentSimulator {
+
+    /**
+     * Represents the weather conditions used in the environment simulation.
+     * Each condition has an associated environmental risk factor.
+     */
     public enum WeatherCondition {
         CLEAR(0.0),
         RAINY(0.2),
@@ -26,11 +33,25 @@ public class EnvironmentSimulator {
             return myRiskFactor;
         }
     }
+
+    /**
+     * Represents the traffic intensity categories used to describe road conditions.
+     * Traffic levels are determined by each road's numerical traffic intensity.
+     */
+    public enum TrafficLevel {
+        LIGHT,
+        MODERATE,
+        HEAVY
+    }
+
     /** The current weather condition in the simulation. */
     private WeatherCondition myWeather;
 
     /** The map graph containing the intersections and roads in the simulation. */
     private final MapGraph myMapGraph;
+
+    /** Stores the traffic intensity of each road. */
+    private final Map<Road, Double> myTrafficIntensities;
 
     /**
      * Constructs an EnvironmentSimulator with clear weather,
@@ -41,6 +62,7 @@ public class EnvironmentSimulator {
     public EnvironmentSimulator(MapGraph theGraph) {
         myMapGraph = theGraph;
         myWeather = WeatherCondition.CLEAR;
+        myTrafficIntensities = new HashMap<>();
     }
     /**
      * Returns the current weather condition.
@@ -149,5 +171,64 @@ public class EnvironmentSimulator {
             }
         }
         return list;
+    }
+
+    /**
+     * Gets all blocked roads in the map graph.
+     *
+     * @return a list of roads that are currently blocked
+     */
+    public List<Road> getBlockedRoads() {
+        List<Road> list = new ArrayList<>();
+        for (Road road : myMapGraph.getRoads()) {
+            if(road.isBlocked()) {
+                list.add(road);
+            }
+        }
+        return list;
+    }
+
+    /**
+     * Gets the traffic category for a specific road.
+     *
+     * @param theRoad the road being checked
+     * @return the traffic category based on its intensity
+     */
+    public TrafficLevel getTrafficLevel(Road theRoad) {
+        double intensity = getTrafficIntensity(theRoad);
+
+        if (intensity >= 0.7) {
+            return TrafficLevel.HEAVY;
+        } else if (intensity >= 0.3) {
+            return TrafficLevel.MODERATE;
+        } else {
+            return TrafficLevel.LIGHT;
+        }
+    }
+
+    /**
+     * Sets the traffic intensity for a specific road.
+     *
+     * @param theRoad the road receiving the traffic intensity
+     * @param theIntensity the traffic intensity, from 0.0 to 1.0
+     */
+    public void setTrafficIntensity(Road theRoad, double theIntensity) {
+        if (theIntensity < 0.0 || theIntensity > 1.0) {
+            throw new IllegalArgumentException("Traffic intensity must be between 0.0 and 1.0.");
+        }
+        if (theRoad == null) {
+            throw new IllegalArgumentException("Road cannot be null.");
+        }
+        myTrafficIntensities.put(theRoad, theIntensity);
+    }
+
+    /**
+     * Gets the traffic intensity assigned to a specific road.
+     *
+     * @param theRoad the specific road
+     * @return the traffic intensity, or 0.0 if none has been assigned
+     */
+    public double getTrafficIntensity(Road theRoad) {
+        return myTrafficIntensities.getOrDefault(theRoad, 0.0);
     }
 }
