@@ -91,3 +91,30 @@ ISSUES I HAD
 1. Road stores its start and end as intersection names (Strings), not
    Intersection objects, so MapGraph looks endpoints up by name.
 2. MapGraph used to store intersections in a Map, while RoutePlanner and EnvironmentSimulator loop over getIntersections() as a list. I changed it to a List, which fixes those two classes but means CarPlannerApp and PlannerDashboard need small updates.
+
+
+Abdullah Altaae 
+what i worked on 
+1 road 
+- One-way road between two intersections with distance (miles), speed limit (mph), traffic delay (hours) and a blocked flag
+- Input validation for IDs, endpoints, distance, speed and traffic delay
+- Travel time at the speed limit or at a given (weather-adjusted) speed, including traffic delay
+- `equals()` / `hashCode()` based on road ID, so roads work correctly as map keys and in lists
+2 RoutePlanner
+- Finds the quickest route between two intersections using Dijkstra's algorithm, weighted by travel time
+- Skips blocked roads and blocked intersections
+- Reads roads from the map on every call, so newly added roads, traffic and blockages are always used
+- added Weather-aware routing
+- added Alternative routes
+- Route comparison
+3 GeoProjection
+- Converts latitude/longitude to x/y map coordinates using Web Mercator, the projection OpenStreetMap tiles use
+- set (0, 0) is the top left corner of the map area
+- `distanceMiles()` computes the distance between two coordinates (haversine formula)
+4 OpenStreetMap research
+- Researched the OSM data format (nodes, ways, tags), the Overpass API and tile usage rules
+- Exported a downtown Seattle map (`.osm`) to use as the real-world map
+
+ISSUES I HAD
+i had trouble getting the API working i did most of the time looking at the API and trying to understand how it works
+i worked on GeoProject but didnt create any test, will still need to be worked on next week to finish.
