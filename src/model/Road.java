@@ -220,6 +220,37 @@ public final class Road {
     }
 
     /**
+     * Returns whether the given object is a road with the same ID. Road IDs are
+     * unique across the map, so the start, end, distance, speed limit, traffic
+     * delay and blocked state are not compared.
+     *
+     * @param theOther the object to compare with
+     * @return {@code true} if theOther is a road with an equal ID,
+     *         {@code false} otherwise
+     */
+    @Override
+    public boolean equals(final Object theOther) {
+        if (this == theOther) {
+            return true;
+        }
+        if (!(theOther instanceof Road)) {
+            return false;
+        }
+        return myId == ((Road) theOther).myId;
+    }
+
+    /**
+     * Returns a hash code based only on the ID, consistent with
+     * {@link #equals(Object)}.
+     *
+     * @return the hash code of this road
+     */
+    @Override
+    public int hashCode() {
+        return Integer.hashCode(myId);
+    }
+
+    /**
      * Returns a short description of this road, for debugging.
      *
      * @return a string describing this road
