@@ -8,6 +8,8 @@ import model.Road;
 import model.RoutePlanner;
 import view.PlannerDashboard;
 
+import java.util.ArrayList;
+
 /**
  * Entry point for the Self-Driving Car Route Planner.
  * <p>
@@ -32,7 +34,7 @@ public final class CarPlannerApp {
      */
     public static void main(final String[] theArgs) {
         final MapGraph map = buildSampleMap();
-        final RoutePlanner planner = new RoutePlanner(map, map.getRoads());
+        final RoutePlanner planner = new RoutePlanner(map);
 
         SwingUtilities.invokeLater(() -> new PlannerDashboard(map, planner).setVisible(true));
     }

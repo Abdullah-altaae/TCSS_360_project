@@ -1,13 +1,6 @@
 package model;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.PriorityQueue;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Plans routes between intersections using Dijkstra's algorithm. Roads are
@@ -198,21 +191,6 @@ public final class RoutePlanner {
         return buildPath(previousRoad, startId, endId);
     }
 
-    /**
-     * Returns the total distance of a route.
-     *
-     * @param theRoute the roads in the route
-     * @return the total distance, in miles
-     * @throws IllegalArgumentException if theRoute is null
-     */
-    public double getRouteDistance(final List<Road> theRoute) {
-        requireRoute(theRoute);
-        double total = 0;
-        for (final Road road : theRoute) {
-            total += road.getDistance();
-        }
-        return total;
-    }
 
     /**
      * Returns a route's travel time at the speed limits with no weather or traffic.
@@ -245,6 +223,7 @@ public final class RoutePlanner {
         }
         return total;
     }
+
 
     /**
      * Checks that a route is not null.
@@ -309,6 +288,7 @@ public final class RoutePlanner {
         }
         return index;
     }
+
 
     /**
      * An intersection in the priority queue along with the best time found to

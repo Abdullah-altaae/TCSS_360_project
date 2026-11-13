@@ -1,9 +1,6 @@
 package model;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Simulates environmental conditions that may affect route planning,
@@ -220,6 +217,25 @@ public class EnvironmentSimulator {
             throw new IllegalArgumentException("Road cannot be null.");
         }
         myTrafficIntensities.put(theRoad, theIntensity);
+    }
+
+    /**
+     * Returns the average traffic intensity of the roads in the given route.
+     * Every road counts equally, regardless of its length, and a road with no
+     * intensity set counts as 0.0.
+     *
+     * @param theRoute the route whose roads are averaged
+     * @return the average traffic intensity, from 0.0 to 1.0, or 0.0 if the
+     *         route has no roads
+     * @throws NullPointerException if theRoute is null
+     */
+    public double averageTrafficIntensity(final Route theRoute) {
+        Objects.requireNonNull(theRoute, "route must not be null");
+        double totalIntensity = 0;
+        for (Road road : theRoute.getPath()) {
+            totalIntensity += getTrafficIntensity(road);
+        }
+        return totalIntensity / theRoute.getPath().size();
     }
 
     /**
