@@ -144,35 +144,29 @@ public class SafetyChecker {
         List<Intersection> sharpTurns = findSharpTurns(routeIntersections);
 
         for (Intersection intersection : sharpTurns) {
-            hazards.add(new Hazard(Hazard.HazardType.SHARP_TURN,
-                    Hazard.HazardType.SHARP_TURN.getPenalty()));
+            hazards.add(new Hazard(Hazard.HazardType.SHARP_TURN));
         }
         List<Intersection> blockedIntersections =
                 findBlockedIntersections(routeIntersections);
 
         for (Intersection intersection : blockedIntersections) {
-            hazards.add(new Hazard(Hazard.HazardType.BLOCKED_INTERSECTION,
-                    Hazard.HazardType.BLOCKED_INTERSECTION.getPenalty()));
+            hazards.add(new Hazard(Hazard.HazardType.BLOCKED_INTERSECTION));
         }
         List<Road> blockedRoads = findBlockedRoads(theRoute);
         for (Road road : blockedRoads) {
-            hazards.add(new Hazard(Hazard.HazardType.BLOCKED_ROAD,
-                    Hazard.HazardType.BLOCKED_ROAD.getPenalty()));
+            hazards.add(new Hazard(Hazard.HazardType.BLOCKED_ROAD));
         }
         if (myEnvironmentSimulator.getWeather()
                 == EnvironmentSimulator.WeatherCondition.SNOWY) {
-            hazards.add(new Hazard(Hazard.HazardType.SNOW,
-                    Hazard.HazardType.SNOW.getPenalty()));
+            hazards.add(new Hazard(Hazard.HazardType.SNOW));
         }
         for (Road road : theRoute) {
             double intensity = myEnvironmentSimulator.getTrafficIntensity(road);
             if (myEnvironmentSimulator.getWeather()
                     == EnvironmentSimulator.WeatherCondition.RAINY && intensity >= 0.5) {
-                hazards.add(new Hazard(Hazard.HazardType.RAIN_AND_TRAFFIC,
-                        Hazard.HazardType.RAIN_AND_TRAFFIC.getPenalty()));
+                hazards.add(new Hazard(Hazard.HazardType.RAIN_AND_TRAFFIC));
             } else if (intensity >= 0.7) {
-                hazards.add(new Hazard(Hazard.HazardType.HEAVY_TRAFFIC,
-                        Hazard.HazardType.HEAVY_TRAFFIC.getPenalty()));
+                hazards.add(new Hazard(Hazard.HazardType.HEAVY_TRAFFIC));
             }
         }
         return hazards;

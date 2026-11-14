@@ -25,9 +25,9 @@ public class Hazard {
 
     private final int myPenalty;
 
-    public Hazard(final HazardType theType, final int thePenalty) {
+    public Hazard(final HazardType theType) {
         myType = theType;
-        myPenalty = thePenalty;
+        myPenalty = theType.getPenalty();
     }
     public HazardType getType() {
         return myType;
