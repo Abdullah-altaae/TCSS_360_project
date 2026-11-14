@@ -23,16 +23,13 @@ public class Hazard {
 
     private final HazardType  myType;
 
-    private final int myPenalty;
-
     public Hazard(final HazardType theType) {
         myType = theType;
-        myPenalty = theType.getPenalty();
     }
     public HazardType getType() {
         return myType;
     }
     public int getPenalty() {
-        return myPenalty;
+        return myType.getPenalty();
     }
 }
