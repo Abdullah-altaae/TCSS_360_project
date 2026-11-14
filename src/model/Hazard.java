@@ -29,4 +29,10 @@ public class Hazard {
         myType = theType;
         myPenalty = thePenalty;
     }
+    public HazardType getType() {
+        return myType;
+    }
+    public int getPenalty() {
+        return myPenalty;
+    }
 }

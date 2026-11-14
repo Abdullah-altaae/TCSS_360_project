@@ -9,7 +9,7 @@ import java.util.List;
  * Calculates a numerical safety rating for routes.
  *
  * @author Allia Hussain
- * @version 2 November 2026
+ * @version 14 November 2026
  */
 public class SafetyChecker {
     /** The environment simulator used to access current weather and traffic conditions. */
@@ -128,35 +128,54 @@ public class SafetyChecker {
     }
 
     /**
-     * Calculates the safety penalty caused by weather and traffic conditions.
-     * <p>
-     * Snowy weather adds 20 points to the penalty.
-     * Rainy weather combined with traffic intensity of 0.5 or higher
-     * adds 15 points for each affected road.
-     * Heavy traffic (intensity of 0.7 or higher) adds 10 points
-     * for each affected road.
+     * Finds all safety hazards present along the given route.
      *
-     * @param theRoute the route being evaluated
-     * @return the total environmental safety penalty
+     * @param theRoute the list of roads that make up the route
+     * @return a list of hazards found along the route
      */
-    public int calculateEnvironmentalPenalty(List<Road> theRoute) {
-        int penalty = 0;
-
-        if (myEnvironmentSimulator.getWeather()
-                == EnvironmentSimulator.WeatherCondition.SNOWY) {
-            penalty += 20;
+    public List<Hazard> findHazards(List<Road> theRoute) {
+        List<Hazard> hazards = new ArrayList<>();
+        if (theRoute.isEmpty()) {
+            return hazards;
         }
 
+        List<Intersection> routeIntersections = findRouteIntersections(theRoute);
+
+        List<Intersection> sharpTurns = findSharpTurns(routeIntersections);
+
+        for (Intersection intersection : sharpTurns) {
+            hazards.add(new Hazard(Hazard.HazardType.SHARP_TURN,
+                    Hazard.HazardType.SHARP_TURN.getPenalty()));
+        }
+        List<Intersection> blockedIntersections =
+                findBlockedIntersections(routeIntersections);
+
+        for (Intersection intersection : blockedIntersections) {
+            hazards.add(new Hazard(Hazard.HazardType.BLOCKED_INTERSECTION,
+                    Hazard.HazardType.BLOCKED_INTERSECTION.getPenalty()));
+        }
+        List<Road> blockedRoads = findBlockedRoads(theRoute);
+        for (Road road : blockedRoads) {
+            hazards.add(new Hazard(Hazard.HazardType.BLOCKED_ROAD,
+                    Hazard.HazardType.BLOCKED_ROAD.getPenalty()));
+        }
+        if (myEnvironmentSimulator.getWeather()
+                == EnvironmentSimulator.WeatherCondition.SNOWY) {
+            hazards.add(new Hazard(Hazard.HazardType.SNOW,
+                    Hazard.HazardType.SNOW.getPenalty()));
+        }
         for (Road road : theRoute) {
             double intensity = myEnvironmentSimulator.getTrafficIntensity(road);
             if (myEnvironmentSimulator.getWeather()
                     == EnvironmentSimulator.WeatherCondition.RAINY && intensity >= 0.5) {
-                penalty += 15;
+                hazards.add(new Hazard(Hazard.HazardType.RAIN_AND_TRAFFIC,
+                        Hazard.HazardType.RAIN_AND_TRAFFIC.getPenalty()));
             } else if (intensity >= 0.7) {
-                penalty += 10;
+                hazards.add(new Hazard(Hazard.HazardType.HEAVY_TRAFFIC,
+                        Hazard.HazardType.HEAVY_TRAFFIC.getPenalty()));
             }
         }
-        return penalty;
+        return hazards;
     }
 
     /**
@@ -202,19 +221,35 @@ public class SafetyChecker {
         }
         int safetyRating = 100;
 
-        List<Intersection> routeIntersections = findRouteIntersections(theRoute);
+        List<Hazard> hazards = findHazards(theRoute);
 
-        if (!findBlockedRoads(theRoute).isEmpty() || !findBlockedIntersections(routeIntersections).isEmpty()) {
-            return 0;
+        for (Hazard hazard : hazards) {
+            if (hazard.getType() == Hazard.HazardType.BLOCKED_ROAD
+                    || hazard.getType() == Hazard.HazardType.BLOCKED_INTERSECTION) {
+                return 0;
+            }
+            safetyRating -= hazard.getPenalty();
         }
-
-        List<Intersection> sharpTurns = findSharpTurns(routeIntersections);
-
-        safetyRating -= sharpTurns.size() * 15;
-
-        safetyRating -= calculateEnvironmentalPenalty(theRoute);
 
         safetyRating = Math.max(0, safetyRating);
         return safetyRating;
+    }
+
+    /**
+     * Converts the numerical safety score into a descriptive safety rating.
+     *
+     * @param theRoute the route being evaluated
+     * @return the enum SAFE, MODERATE, or UNSAFE
+     */
+    public SafetyRating getSafetyRating(List<Road> theRoute) {
+        int rating = calculateSafetyRating(theRoute);
+
+        if (rating >= 80) {
+            return SafetyRating.SAFE;
+        } else if (rating >= 50) {
+            return SafetyRating.MODERATE;
+        } else {
+            return SafetyRating.UNSAFE;
+        }
     }
 }
