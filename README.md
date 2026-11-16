@@ -175,4 +175,3 @@ ISSUES I HAD
 3. RoutePlannerTest still used the old RoutePlanner constructor, which
    stopped all tests from compiling. I excluded it locally to run my
    tests and told the author.
-4. Short week because of Veterans Day.
