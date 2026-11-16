@@ -155,3 +155,24 @@ what i worked on
 ISSUES I HAD
 i had trouble getting the API working i did most of the time looking at the API and trying to understand how it works
 i worked on GeoProject but didnt create any test, will still need to be worked on next week to finish.
+
+Week 3 :
+Anjana Virani
+
+WHAT I WORKED ON
+- Hazard display: safety rating next to Plan Route, hazards listed in the
+  safety log and marked in orange on the map.
+- Safer alternative route shown as a dashed green line.
+- Updated CarPlannerApp and PlannerController for the new RoutePlanner
+  and SafetyChecker.
+- JUnit tests for the safety features (43 tests passing in
+  PlannerControllerTest).
+
+ISSUES I HAD
+1. Hazard does not store its location, so I used SafetyChecker's helper
+   methods to find where hazards are.
+2. Merge conflicts and out-of-date files when merging my branch into main.
+3. RoutePlannerTest still used the old RoutePlanner constructor, which
+   stopped all tests from compiling. I excluded it locally to run my
+   tests and told the author.
+4. Short week because of Veterans Day.
