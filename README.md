@@ -71,7 +71,13 @@ Implemented sharp-turn detection using vector calculations.
 
 No such Issues this week!
 
-
+Week 3:
+1. What I worked on:
+- Added a FindHazards method to SafetyChecker that creates a list of hazards along a specific route.
+  It uses hazards described in the Hazard class instead of creating hazards on its own (the way I previously had).
+- Also added methods that accurately calculates the safety penalties by calling the methods from the Hazard class.
+- Added a method that converts numerical safety ratings to descriptive rating for user to understand easily.
+- Added tests for EnvironmentSimulator class. 
 
 
 
