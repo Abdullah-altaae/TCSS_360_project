@@ -52,18 +52,18 @@ public final class DataBaseSandBox {
         failures += check(routeB != routeA, "a second route gets a different id");
         failures += check(countRows("routes") == 2, "routes has 2 rows after the second insert");
 
-        final int runA = db.saveSimulationRun(routeA, "RAIN", 1.5, 0.25, 0.40);
+        final int runA = db.saveSimulationRun(routeA, 0.5, EnvironmentSimulator.WeatherCondition.RAINY, 85, 0.25, 0.40);
         failures += check(runA > 0, "saveSimulationRun returns a positive id");
         failures += check(countRows("simulation_runs") == 1, "simulation_runs has 1 row");
 
-        final int hazardA = db.saveHazard(runA, "BLOCKED_ROAD", "R2", 3);
+        final int hazardA = db.saveHazard(runA, Hazard.HazardType.BLOCKED_ROAD, Hazard.HazardType.BLOCKED_ROAD.getPenalty());
         failures += check(hazardA > 0, "saveHazard returns a positive id");
         failures += check(countRows("hazards") == 1, "hazards has 1 row");
 
         // ----- Foreign key enforcement -----
         boolean rejected = false;
         try {
-            db.saveSimulationRun(999, "CLEAR", 0.0, 1.0, 1.0);
+            db.saveSimulationRun(999, 0.0, EnvironmentSimulator.WeatherCondition.CLEAR, 100, 1.0, 1.0);
         } catch (final SQLException ex) {
             rejected = true;
         }
@@ -73,7 +73,7 @@ public final class DataBaseSandBox {
         db.deleteHazard(hazardA);
         failures += check(countRows("hazards") == 0, "deleteHazard removes the hazard");
 
-        db.saveHazard(runA, "SHARP_TURNS", "R1-R3", 2);
+        db.saveHazard(runA, Hazard.HazardType.SHARP_TURN, Hazard.HazardType.SHARP_TURN.getPenalty());
         db.deleteRoute(routeA);
         failures += check(countRows("routes") == 1, "deleteRoute removes only that route");
         failures += check(countRows("simulation_runs") == 0,

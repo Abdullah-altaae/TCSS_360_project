@@ -133,6 +133,38 @@ ISSUES I HAD
    insert has to happen somewhere that can pass the generated IDs to the
    Route, SimulationRun and Hazard constructors.
 
+Week 3/Iteration 3
+
+WHAT I WORKED ON
+- RouteDatabase (model): set up the database to store SimulationRun and
+  Hazard objects, with foreign keys to the Route each one belongs to.
+  Added and updated the columns in the simulation_runs and hazards
+  tables to hold the new data in the model classes, then updated the
+  save and load methods.
+- Route and SimulationRun (model): refactored both classes so a new
+  route or run can be a temporary object with an ID of -1 until the
+  user chooses to save it. Added a secondary constructor, helper
+  methods and ID checks, so saving takes the data from the temporary
+  object and makes a new permanent object with the ID the database
+  generates. Worked with the teammate who set up the environment
+  simulator to improve SimulationRun.
+- Hazard (model): added enums for the different types of hazards, each
+  with a penalty value used to rate a route, and used them when Hazard
+  objects are created.
+- PlannerController and CarPlannerApp (controller): added logic to
+  handle requests to save generated routes, with helper methods that
+  build the data needed to create Route objects. Updated both classes
+  to support saving temporary routes, and planned how to finish
+  connecting SimulationRun and Route in the controller so the view can
+  use them.
+- Updated the Javadoc on Hazard and the whole database class.
+
+ISSUES I HAD
+1. Keeping the Route, SimulationRun and Hazard classes, the database
+   class and the controller classes in sync was tricky. The data, the
+   types of data and the parameters kept changing as updates were made
+   throughout the week and as the team shared what they needed.
+
 
 
 
