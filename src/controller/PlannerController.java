@@ -1,16 +1,13 @@
 package controller;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-import model.EnvironmentSimulator;
+import model.*;
 import model.EnvironmentSimulator.WeatherCondition;
-import model.Intersection;
-import model.MapGraph;
-import model.Road;
-import model.RoutePlanner;
 import view.PlannerDashboard;
 
 /**
@@ -45,6 +42,9 @@ public class PlannerController {
     /** The simulator that applies weather, traffic and obstacles. */
     private final EnvironmentSimulator mySimulator;
 
+    /** The database the stores the routes, simulations, and hazards. */
+    private RouteDatabase myDatabase;
+
     /** The view that displays results, or null until it is set. */
     private PlannerDashboard myView;
 
@@ -53,6 +53,10 @@ public class PlannerController {
 
     /** The end of the last successfully planned route, or null. */
     private String myLastEndId;
+
+   /** The temp object of the last successfully planned route or null.*/
+    private Route myLastRoute;
+
 
     /**
      * Creates a controller for the given map, route planner and simulator.
@@ -67,6 +71,7 @@ public class PlannerController {
         myMap = Objects.requireNonNull(theMap, "map must not be null");
         myPlanner = Objects.requireNonNull(thePlanner, "planner must not be null");
         mySimulator = Objects.requireNonNull(theSimulator, "simulator must not be null");
+        myDatabase = new RouteDatabase("jdbc:sqlite:RouteDB");
     }
 
     /**
@@ -173,7 +178,7 @@ public class PlannerController {
      *                                  if both names are the same, or if no
      *                                  route exists
      */
-    public List<Road> computeRoute(final String theStartId, final String theEndId) {
+    public Route computeRoute(final String theStartId, final String theEndId) {
         if (theStartId == null || theEndId == null) {
             throw new IllegalArgumentException(
                     "Please choose both a start and an end intersection.");
@@ -190,12 +195,12 @@ public class PlannerController {
                     + (start == null ? theStartId : theEndId));
         }
 
-        final List<Road> route = myPlanner.findRoute(start, end);
-        if (route == null || route.isEmpty()) {
+        final List<Road> path = myPlanner.findRoute(start, end);
+        if (path == null || path.isEmpty()) {
             throw new IllegalArgumentException(
                     "No route found from " + theStartId + " to " + theEndId + ".");
         }
-        return route;
+        return new Route(theStartId, theEndId, path);
     }
 
     /**
@@ -212,9 +217,11 @@ public class PlannerController {
             throw new IllegalStateException("setView must be called before planRoute");
         }
         try {
-            myView.showRoute(computeRoute(theStartId, theEndId));
+            Route tempRoute = computeRoute(theStartId, theEndId);
+            myView.showRoute(tempRoute.getPath());
             myLastStartId = theStartId;
             myLastEndId = theEndId;
+            myLastRoute = tempRoute;
         } catch (final IllegalArgumentException ex) {
             myView.clearRoute();
             myView.showError(ex.getMessage());
@@ -223,6 +230,30 @@ public class PlannerController {
             myView.showError("Route planning failed: " + ex.getMessage());
         }
     }
+
+    /**
+     * Saves the most recently planned route to the database and tells the view
+     * whether the save worked. If no route has been planned yet, the view shows
+     * an error; if this route is already saved, the view shows a message and
+     * nothing is saved again. A failed save is reported to the view as an error.
+     */
+    public void saveRoute() {
+        if (myLastRoute == null) {
+            myView.showError("Plan a route before saving.");
+        } else if (myLastRoute.isSaved()) {
+            showMessage("This route is already saved.");
+        }
+        else {
+            try {
+                int id = myDatabase.saveRoute(myLastRoute.getStart(), myLastRoute.getEnd(), myLastRoute.getPathString(), myLastRoute.getDistance());
+                myLastRoute.withId(id);
+                showMessage("Route saved.");
+            } catch (SQLException ex) {
+                myView.showError("Could not save the route: " + ex.getMessage());
+            }
+        }
+    }
+
 
     // ------------------------------------------------------------------
     // Environment simulation
@@ -347,4 +378,6 @@ public class PlannerController {
             planRoute(myLastStartId, myLastEndId);
         }
     }
+
+
 }
