@@ -165,8 +165,7 @@ WHAT I WORKED ON
 - Safer alternative route shown as a dashed green line.
 - Updated CarPlannerApp and PlannerController for the new RoutePlanner
   and SafetyChecker.
-- JUnit tests for the safety features (43 tests passing in
-  PlannerControllerTest).
+- JUnit tests for the safety features 
 
 ISSUES I HAD
 1. Hazard does not store its location, so I used SafetyChecker's helper
