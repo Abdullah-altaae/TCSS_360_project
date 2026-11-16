@@ -231,6 +231,9 @@ public class EnvironmentSimulator {
      */
     public double averageTrafficIntensity(final Route theRoute) {
         Objects.requireNonNull(theRoute, "route must not be null");
+        if (theRoute.getPath().isEmpty()) {
+            return 0.0;
+        }
         double totalIntensity = 0;
         for (Road road : theRoute.getPath()) {
             totalIntensity += getTrafficIntensity(road);
