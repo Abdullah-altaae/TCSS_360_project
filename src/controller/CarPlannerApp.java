@@ -1,7 +1,10 @@
 package controller;
 
+import java.util.ArrayList;
+
 import javax.swing.SwingUtilities;
 
+import model.EnvironmentSimulator;
 import model.Intersection;
 import model.MapGraph;
 import model.Road;
@@ -11,12 +14,13 @@ import view.PlannerDashboard;
 /**
  * Entry point for the Self-Driving Car Route Planner.
  * <p>
- * Builds a small sample city map, creates the route planner and opens
- * the {@link PlannerDashboard} on the Swing event thread.
+ * Builds a small sample city map, then connects the three MVC parts:
+ * the model (map, route planner and environment simulator), the controller
+ * ({@link PlannerController}) and the view ({@link PlannerDashboard}).
  * </p>
  *
  * @author Anjana Virani
- * @version 4 November 2026
+ * @version 15 November 2026
  */
 public final class CarPlannerApp {
 
@@ -32,9 +36,15 @@ public final class CarPlannerApp {
      */
     public static void main(final String[] theArgs) {
         final MapGraph map = buildSampleMap();
-        final RoutePlanner planner = new RoutePlanner(map, map.getRoads());
+        final EnvironmentSimulator simulator = new EnvironmentSimulator(map);
+        final RoutePlanner planner = new RoutePlanner(map, simulator);
+        final PlannerController controller = new PlannerController(map, planner, simulator);
 
-        SwingUtilities.invokeLater(() -> new PlannerDashboard(map, planner).setVisible(true));
+        SwingUtilities.invokeLater(() -> {
+            final PlannerDashboard view = new PlannerDashboard(map, controller);
+            controller.setView(view);
+            view.setVisible(true);
+        });
     }
 
     /**
