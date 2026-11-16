@@ -179,18 +179,20 @@ ISSUES I HAD
 
 Abdullah Altaae
 what i worked on
-1 road
+
+1. road
 i changed some of the code in road so it can bends between start and end intersection, so the map can draw the curved
 area instead of just straight line.
-2 Loads a real city map from an OpenStreetMap file so that the planner can work. it uses real streets
+
+2. Loads a real city map from an OpenStreetMap file so that the planner can work. it uses real streets
 i added good amount of the code however i didnt really add javaDoc. i want able to finish the implementation
 but it should be able to be ran.
 what is included in the OsmMapLoader
--parse to read the file one tag at a time instead of loading the whole 14 MB file as a tree
--Filtering it keeps a way only if its a highway type and avoiding sidewalks
--Building the graph. doing so by clip each way where it leaves the bounds box, so nothing draws off-screen
--cut into roads walk each way, adding up distance with GeoProjection distance miles.
--create objects by converting lat/lon to x/y.
+- parse to read the file one tag at a time instead of loading the whole 14 MB file as a tree
+- Filtering it keeps a way only if its a highway type and avoiding sidewalks
+- Building the graph. doing so by clip each way where it leaves the bounds box, so nothing draws off-screen
+- cut into roads walk each way, adding up distance with GeoProjection distance miles.
+- create objects by converting lat/lon to x/y.
 
 ISSUES I HAD
 i was mostly looking into how this should be done, i spent a good amount of time, reading and
