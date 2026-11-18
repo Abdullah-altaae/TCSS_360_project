@@ -71,7 +71,13 @@ Implemented sharp-turn detection using vector calculations.
 
 No such Issues this week!
 
-
+Week 3:
+What I worked on:
+- Added a FindHazards method to SafetyChecker that creates a list of hazards along a specific route.
+  It uses hazards described in the Hazard class instead of creating hazards on its own (the way I previously had).
+- Also added methods that accurately calculates the safety penalties by calling the methods from the Hazard class.
+- Added a method that converts numerical safety ratings to descriptive rating for user to understand easily.
+- Added tests for EnvironmentSimulator class. 
 
 
 
@@ -127,6 +133,38 @@ ISSUES I HAD
    insert has to happen somewhere that can pass the generated IDs to the
    Route, SimulationRun and Hazard constructors.
 
+Week 3/Iteration 3
+
+WHAT I WORKED ON
+- RouteDatabase (model): set up the database to store SimulationRun and
+  Hazard objects, with foreign keys to the Route each one belongs to.
+  Added and updated the columns in the simulation_runs and hazards
+  tables to hold the new data in the model classes, then updated the
+  save and load methods.
+- Route and SimulationRun (model): refactored both classes so a new
+  route or run can be a temporary object with an ID of -1 until the
+  user chooses to save it. Added a secondary constructor, helper
+  methods and ID checks, so saving takes the data from the temporary
+  object and makes a new permanent object with the ID the database
+  generates. Worked with the teammate who set up the environment
+  simulator to improve SimulationRun.
+- Hazard (model): added enums for the different types of hazards, each
+  with a penalty value used to rate a route, and used them when Hazard
+  objects are created.
+- PlannerController and CarPlannerApp (controller): added logic to
+  handle requests to save generated routes, with helper methods that
+  build the data needed to create Route objects. Updated both classes
+  to support saving temporary routes, and planned how to finish
+  connecting SimulationRun and Route in the controller so the view can
+  use them.
+- Updated the Javadoc on Hazard and the whole database class.
+
+ISSUES I HAD
+1. Keeping the Route, SimulationRun and Hazard classes, the database
+   class and the controller classes in sync was tricky. The data, the
+   types of data and the parameters kept changing as updates were made
+   throughout the week and as the team shared what they needed.
+
 
 
 
@@ -155,3 +193,47 @@ what i worked on
 ISSUES I HAD
 i had trouble getting the API working i did most of the time looking at the API and trying to understand how it works
 i worked on GeoProject but didnt create any test, will still need to be worked on next week to finish.
+
+Week 3/Iteration 3
+
+Week 3 :
+Anjana Virani
+
+WHAT I WORKED ON
+- Hazard display: safety rating next to Plan Route, hazards listed in the
+  safety log and marked in orange on the map.
+- Safer alternative route shown as a dashed green line.
+- Updated CarPlannerApp and PlannerController for the new RoutePlanner
+  and SafetyChecker.
+- JUnit tests for the safety features 
+
+ISSUES I HAD
+1. Hazard does not store its location, so I used SafetyChecker's helper
+   methods to find where hazards are.
+2. Merge conflicts and out-of-date files when merging my branch into main.
+3. RoutePlannerTest still used the old RoutePlanner constructor, which
+   stopped all tests from compiling. I excluded it locally to run my
+   tests and told the author.
+
+Abdullah Altaae
+what i worked on
+
+1. road
+i changed some of the code in road so it can bends between start and end intersection, so the map can draw the curved
+area instead of just straight line.
+
+2. Loads a real city map from an OpenStreetMap file so that the planner can work. it uses real streets
+i added good amount of the code however i didnt really add javaDoc. i want able to finish the implementation
+but it should be able to be ran.
+what is included in the OsmMapLoader
+- parse to read the file one tag at a time instead of loading the whole 14 MB file as a tree
+- Filtering it keeps a way only if its a highway type and avoiding sidewalks
+- Building the graph. doing so by clip each way where it leaves the bounds box, so nothing draws off-screen
+- cut into roads walk each way, adding up distance with GeoProjection distance miles.
+- create objects by converting lat/lon to x/y.
+
+ISSUES I HAD
+i was mostly looking into how this should be done, i spent a good amount of time, reading and
+watching how this is going to work. i have an understanding of where thing should be in the future. but i
+still need time to do the work required.
+

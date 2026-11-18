@@ -5,6 +5,7 @@
 
 package model;
 import java.sql.*;
+import java.util.Objects;
 
 /**
  * Saves, loads, and deletes generated routes, the simulation runs done on
@@ -13,8 +14,13 @@ import java.sql.*;
  * <p>Each simulation run belongs to one route, and each hazard belongs to
  * one simulation run.</p>
  *
+ * <p>The columns of each table match the data stored in the {@link Route},
+ * {@link SimulationRun}, and {@link Hazard} classes. A route's roads are
+ * stored as its path string, and weather conditions and hazard types are
+ * stored by their enum names.</p>
+ *
  * @author Felix Kiama
- * @version 7 November 2026
+ * @version 15 November 2026
  */
 public class RouteDatabase {
 
@@ -32,7 +38,8 @@ public class RouteDatabase {
 
     /**
      * Creates the routes, simulation_runs, and hazards tables if they do not
-     * already exist.
+     * already exist. Tables that already exist are not changed, so a database
+     * file made with an older version of these tables must be deleted first.
      *
      * @throws SQLException if the tables cannot be created
      */
@@ -53,8 +60,9 @@ public class RouteDatabase {
             CREATE TABLE if not exists simulation_runs (
                 sim_id INTEGER  PRIMARY KEY AUTOINCREMENT,
                 route_id INTEGER NOT NULL,
+                average_traffic REAL NOT NULL,
                 weather TEXT NOT NULL,
-                traffic_level REAL NOT NULL,
+                safety_rating INTEGER NOT NULL,
                 normal_time REAL NOT NULL,
                 simulated_time REAL NOT NULL,
                 FOREIGN KEY (route_id) REFERENCES routes(route_id) ON DELETE CASCADE);
@@ -66,8 +74,7 @@ public class RouteDatabase {
                 hazard_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 sim_id INTEGER NOT NULL,
                 hazard_type TEXT NOT NULL,
-                location TEXT NOT NULL,
-                severity INTEGER NOT NULL,
+                penalty INTEGER NOT NULL,
                 FOREIGN KEY (sim_id) REFERENCES simulation_runs(sim_id) ON DELETE CASCADE);
             """);
         }
@@ -106,23 +113,31 @@ public class RouteDatabase {
      * Saves a new simulation run for a route.
      *
      * @param theRouteId the ID of the route that was simulated
+     * @param theAverageTraffic the average traffic intensity of the route's
+     *                          roads during the run, from 0.0 to 1.0
      * @param theWeather the weather during the run
-     * @param theTraffic the traffic level during the run
+     * @param theSafetyRating the safety rating of the route during the run,
+     *                        from 0 to 100
      * @param theNormalTime the travel time with normal conditions
      * @param theSimulatedTime the travel time with simulated conditions
      * @return the ID of the saved simulation run
+     * @throws NullPointerException if theWeather is null
      * @throws SQLException if the simulation run cannot be saved
      */
-    public int saveSimulationRun(final int theRouteId, final String theWeather, final double theTraffic,
-                                  final double theNormalTime, final double theSimulatedTime) throws SQLException {
-        final String sql = "INSERT INTO simulation_runs (route_id, weather, traffic_level, normal_time, simulated_time) VALUES (?, ?, ?, ?, ?)";
+    public int saveSimulationRun(final int theRouteId, final double theAverageTraffic,
+                                  final EnvironmentSimulator.WeatherCondition theWeather,
+                                  final int theSafetyRating, final double theNormalTime,
+                                  final double theSimulatedTime) throws SQLException {
+        Objects.requireNonNull(theWeather, "weather must not be null");
+        final String sql = "INSERT INTO simulation_runs (route_id, average_traffic, weather, safety_rating, normal_time, simulated_time) VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             pstmt.setInt(1, theRouteId);
-            pstmt.setString(2, theWeather);
-            pstmt.setDouble(3, theTraffic);
-            pstmt.setDouble(4, theNormalTime);
-            pstmt.setDouble(5, theSimulatedTime);
+            pstmt.setDouble(2, theAverageTraffic);
+            pstmt.setString(3, theWeather.name());
+            pstmt.setInt(4, theSafetyRating);
+            pstmt.setDouble(5, theNormalTime);
+            pstmt.setDouble(6, theSimulatedTime);
             pstmt.executeUpdate();
             try (final ResultSet rs = pstmt.getGeneratedKeys()) {
                 if (rs.next()) {
@@ -138,20 +153,21 @@ public class RouteDatabase {
      *
      * @param theSimId the ID of the simulation run the hazard belongs to
      * @param theType the type of hazard
-     * @param theLocation where the hazard is
-     * @param theSeverity how severe the hazard is
+     * @param thePenalty the number of points the hazard takes off the route's
+     *                   safety rating
      * @return the ID of the saved hazard
+     * @throws NullPointerException if theType is null
      * @throws SQLException if the hazard cannot be saved
      */
-    public int saveHazard(final int theSimId, final String theType, final String theLocation,
-                          final int theSeverity) throws SQLException {
-        final String sql = "INSERT INTO hazards (sim_id, hazard_type, location, severity) VALUES (?, ?, ?, ?)";
+    public int saveHazard(final int theSimId, final Hazard.HazardType theType,
+                          final int thePenalty) throws SQLException {
+        Objects.requireNonNull(theType, "hazard type must not be null");
+        final String sql = "INSERT INTO hazards (sim_id, hazard_type, penalty) VALUES (?, ?, ?)";
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             pstmt.setInt(1, theSimId);
-            pstmt.setString(2, theType);
-            pstmt.setString(3, theLocation);
-            pstmt.setInt(4, theSeverity);
+            pstmt.setString(2, theType.name());
+            pstmt.setInt(3, thePenalty);
             pstmt.executeUpdate();
             try (final ResultSet rs = pstmt.getGeneratedKeys()) {
                 if (rs.next()) {
@@ -201,8 +217,10 @@ public class RouteDatabase {
             try (final ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     final int routeId = rs.getInt("route_id");
-                    final String weather =  rs.getString("weather");
-                    final double trafficLevel = rs.getDouble("traffic_level");
+                    final double averageTraffic = rs.getDouble("average_traffic");
+                    final EnvironmentSimulator.WeatherCondition weather =
+                            EnvironmentSimulator.WeatherCondition.valueOf(rs.getString("weather"));
+                    final int safetyRating = rs.getInt("safety_rating");
                     final double normalTime = rs.getDouble("normal_time");
                     final double simulatedTime = rs.getDouble("simulated_time");
                 }
@@ -226,9 +244,8 @@ public class RouteDatabase {
             try (final ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     final int simId = rs.getInt("sim_id");
-                    final String type =  rs.getString("hazard_type");
-                    final String location = rs.getString("location");
-                    final int severity = rs.getInt("severity");
+                    final Hazard.HazardType type = Hazard.HazardType.valueOf(rs.getString("hazard_type"));
+                    final int penalty = rs.getInt("penalty");
                 }
             }
         }

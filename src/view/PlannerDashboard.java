@@ -11,9 +11,12 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.swing.BorderFactory;
+import javax.swing.Box;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
@@ -26,33 +29,48 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 
+import controller.PlannerController;
+import controller.PlannerController.SafetyReport;
 import model.Intersection;
 import model.MapGraph;
 import model.Road;
-import model.RoutePlanner;
+import model.SafetyRating;
 
 /**
- * The main window of the Self-Driving Car Route Planner.
+ * The main window of the Self-Driving Car Route Planner (the view in MVC).
  * <p>
  * The dashboard contains a menu bar (File and Help), a route input form for
  * choosing start and end intersections, a map panel that draws the city graph
  * and highlights the planned route, and a safety log area for messages.
  * </p>
  * <p>
- * Roads refer to their intersections by ID, so the dashboard looks up the
- * matching {@link Intersection} whenever it needs coordinates.
+ * User actions are passed to the {@link PlannerController}, which talks to
+ * the model and calls {@link #showRoute(List)}, {@link #showSafetyReport}
+ * or {@link #showError(String)} with the result. The dashboard only reads
+ * the map to draw it.
+ * </p>
+ * <p>
+ * Map colors: blue is the route, orange marks hazards, red marks blocked
+ * roads and intersections, and a dashed green line shows a safer
+ * alternative route.
  * </p>
  *
  * @author Anjana Virani
- * @version 4 November 2026
+ * @version 15 November 2026
  */
 public class PlannerDashboard extends JFrame {
 
     /** Default width of the window in pixels. */
-    private static final int WINDOW_WIDTH = 850;
+    private static final int WINDOW_WIDTH = 1100;
 
     /** Default height of the window in pixels. */
-    private static final int WINDOW_HEIGHT = 650;
+    private static final int WINDOW_HEIGHT = 680;
+
+    /** Color used for hazards and the MODERATE rating. */
+    private static final Color HAZARD_COLOR = new Color(245, 140, 0);
+
+    /** Color used for the safer alternative route and the SAFE rating. */
+    private static final Color SAFE_COLOR = new Color(20, 150, 60);
 
     /** Number of minutes in one hour. */
     private static final double MINUTES_PER_HOUR = 60.0;
@@ -60,14 +78,17 @@ public class PlannerDashboard extends JFrame {
     /** The city map displayed by this dashboard. */
     private final MapGraph map;
 
-    /** The planner used to compute routes. */
-    private final RoutePlanner planner;
+    /** The controller that handles user actions. */
+    private final PlannerController controller;
 
     /** Drop-down list of possible start intersections. */
     private JComboBox<String> startBox;
 
     /** Drop-down list of possible end intersections. */
     private JComboBox<String> endBox;
+
+    /** Label that shows the current route's safety rating. */
+    private JLabel mySafetyLabel;
 
     /** Text area that shows route details, hazards and errors. */
     private JTextArea logArea;
@@ -76,15 +97,15 @@ public class PlannerDashboard extends JFrame {
     private final MapPanel mapPanel;
 
     /**
-     * Creates the dashboard window for the given map and route planner.
+     * Creates the dashboard window for the given map and controller.
      *
      * @param theMap the city map to display
-     * @param thePlanner the route planner used to compute routes
+     * @param theController the controller that handles user actions
      */
-    public PlannerDashboard(final MapGraph theMap, final RoutePlanner thePlanner) {
+    public PlannerDashboard(final MapGraph theMap, final PlannerController theController) {
         super("Self-Driving Car Route Planner");
         map = theMap;
-        planner = thePlanner;
+        controller = theController;
 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setJMenuBar(buildMenuBar());
@@ -94,6 +115,7 @@ public class PlannerDashboard extends JFrame {
         add(buildInputPanel(), BorderLayout.NORTH);
         add(mapPanel, BorderLayout.CENTER);
         add(buildLogPanel(), BorderLayout.SOUTH);
+        add(new SimulationPanel(controller), BorderLayout.EAST);
 
         setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
         setLocationRelativeTo(null);
@@ -139,7 +161,7 @@ public class PlannerDashboard extends JFrame {
         aboutItem.addActionListener(theEvent -> JOptionPane.showMessageDialog(this,
                 "Self-Driving Car Route Planner and Safety Checker\n"
                         + "Team: Abdullah, Felix, Allia, Anjana\n"
-                        + "Version: Iteration 1",
+                        + "Version: Iteration 3",
                 "About", JOptionPane.INFORMATION_MESSAGE));
 
         final JMenuItem instructionsItem = new JMenuItem("Instructions");
@@ -148,7 +170,18 @@ public class PlannerDashboard extends JFrame {
                         + "2. Choose an end intersection.\n"
                         + "3. Click \"Plan Route\".\n"
                         + "The route is highlighted in blue on the map and its\n"
-                        + "details appear in the safety log at the bottom.",
+                        + "details appear in the safety log at the bottom.\n\n"
+                        + "Use the Simulation panel on the right to change the\n"
+                        + "weather, block intersections or roads, and add traffic.\n"
+                        + "The route is planned again after every change.\n\n"
+                        + "Every route gets a safety check. Its rating appears\n"
+                        + "next to the Plan Route button and hazards are listed\n"
+                        + "in the safety log.\n\n"
+                        + "Map colors:\n"
+                        + "  Blue = your route\n"
+                        + "  Orange = hazard (sharp turn, traffic)\n"
+                        + "  Red = blocked\n"
+                        + "  Dashed green = safer alternative route",
                 "Instructions", JOptionPane.INFORMATION_MESSAGE));
 
         helpMenu.add(aboutItem);
@@ -166,11 +199,7 @@ public class PlannerDashboard extends JFrame {
      * @return the input panel
      */
     private JPanel buildInputPanel() {
-        final List<String> ids = new ArrayList<>();
-        for (final Intersection intersection : map.getIntersections()) {
-            ids.add(intersection.getId());
-        }
-        final String[] idArray = ids.toArray(new String[0]);
+        final String[] idArray = controller.getIntersectionNames().toArray(new String[0]);
 
         startBox = new JComboBox<>(idArray);
         endBox = new JComboBox<>(idArray);
@@ -188,6 +217,11 @@ public class PlannerDashboard extends JFrame {
         panel.add(new JLabel("End:"));
         panel.add(endBox);
         panel.add(planButton);
+
+        mySafetyLabel = new JLabel(" ");
+        mySafetyLabel.setFont(mySafetyLabel.getFont().deriveFont(Font.BOLD, 14f));
+        panel.add(Box.createHorizontalStrut(20));
+        panel.add(mySafetyLabel);
         return panel;
     }
 
@@ -208,56 +242,20 @@ public class PlannerDashboard extends JFrame {
     }
 
     /**
-     * Finds the intersection with the given ID on the map.
-     *
-     * @param theId the intersection ID to look for
-     * @return the matching intersection, or null if none exists
-     */
-    private Intersection findIntersection(final String theId) {
-        for (final Intersection intersection : map.getIntersections()) {
-            if (intersection.getId().equals(theId)) {
-                return intersection;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Handles the "Plan Route" button. Reads the selected intersections,
-     * asks the planner for a route and displays the result or an error.
+     * Handles the "Plan Route" button by passing the selected intersections
+     * to the controller. The controller checks the input, computes the route
+     * and calls back {@link #showRoute(List)} or {@link #showError(String)}.
      */
     private void onPlanRoute() {
-        final String startId = (String) startBox.getSelectedItem();
-        final String endId = (String) endBox.getSelectedItem();
-
-        if (startId == null || endId == null) {
-            showError("Please choose both a start and an end intersection.");
-            return;
-        }
-        if (startId.equals(endId)) {
-            showError("Start and end intersections must be different.");
-            return;
-        }
-
-        final Intersection start = findIntersection(startId);
-        final Intersection end = findIntersection(endId);
-
-        try {
-            final List<Road> route = planner.findRoute(start, end);
-            if (route == null || route.isEmpty()) {
-                showError("No route found from " + startId + " to " + endId + ".");
-            } else {
-                showRoute(route);
-            }
-        } catch (final RuntimeException ex) {
-            showError("Route planning failed: " + ex.getMessage());
-        }
+        controller.planRoute((String) startBox.getSelectedItem(),
+                (String) endBox.getSelectedItem());
     }
 
     /**
      * Highlights the given route on the map and writes its details
      * (each road, total distance and estimated time) to the log.
-     * Travel time includes any traffic delay on each road.
+     * Travel time is adjusted for the current weather and includes any
+     * traffic delay on each road.
      *
      * @param theRoute the ordered list of roads in the route
      */
@@ -269,14 +267,19 @@ public class PlannerDashboard extends JFrame {
         final StringBuilder sb = new StringBuilder();
         sb.append("\nRoute from ").append(theRoute.get(0).getStart())
                 .append(" to ").append(theRoute.get(theRoute.size() - 1).getEnd())
-                .append(":\n");
+                .append(" (weather: ").append(controller.getWeather()).append("):\n");
 
         for (final Road road : theRoute) {
             totalDistance += road.getDistance();
-            totalMinutes += road.getTravelTime() * MINUTES_PER_HOUR;
-            sb.append(String.format("  %s -> %s  %.1f mi @ %.0f mph%s%n",
+            totalMinutes += controller.getAdjustedTravelTime(road) * MINUTES_PER_HOUR;
+            sb.append(String.format("  %s -> %s  %.1f mi @ %.0f mph%s%s%n",
                     road.getStart(), road.getEnd(), road.getDistance(),
-                    road.getSpeedLimit(), road.isBlocked() ? "  (BLOCKED)" : ""));
+                    road.getSpeedLimit(),
+                    road.getTrafficDelay() > 0
+                            ? String.format("  +%.0f min traffic",
+                            road.getTrafficDelay() * MINUTES_PER_HOUR)
+                            : "",
+                    road.isBlocked() ? "  (BLOCKED)" : ""));
         }
         sb.append(String.format("Total: %.1f mi, about %.1f minutes%n",
                 totalDistance, totalMinutes));
@@ -296,6 +299,85 @@ public class PlannerDashboard extends JFrame {
     }
 
     /**
+     * Shows the result of a route's safety check: the rating next to the
+     * Plan Route button, the hazards in the safety log and on the map, and
+     * a safer alternative route if there is one.
+     *
+     * @param theReport the safety report from the controller
+     */
+    public void showSafetyReport(final SafetyReport theReport) {
+        mySafetyLabel.setText("Safety: " + theReport.getRating()
+                + " (" + theReport.getScore() + "/100)");
+        mySafetyLabel.setForeground(ratingColor(theReport.getRating()));
+
+        final StringBuilder sb = new StringBuilder();
+        sb.append(String.format("Safety check: %d/100 (%s)%n",
+                theReport.getScore(), theReport.getRating()));
+        if (theReport.hasHazards()) {
+            for (final String warning : theReport.getWarnings()) {
+                sb.append("  ! ").append(warning).append('\n');
+            }
+        } else {
+            sb.append("  No hazards found on this route.\n");
+        }
+        if (theReport.hasAlternative()) {
+            final List<Road> alt = theReport.getAlternative();
+            sb.append(String.format("  Safer alternative (%d/100): %s",
+                    theReport.getAlternativeScore(), alt.get(0).getStart()));
+            for (final Road road : alt) {
+                sb.append(" -> ").append(road.getEnd());
+            }
+            sb.append("  (dashed green on the map)\n");
+        }
+        logArea.append(sb.toString());
+        logArea.setCaretPosition(logArea.getDocument().getLength());
+
+        mapPanel.setSafety(theReport.getHazardIntersections(),
+                theReport.getHazardRoadIds(), theReport.getAlternative());
+    }
+
+    /**
+     * Returns the color used to show a safety rating.
+     *
+     * @param theRating the rating
+     * @return green for SAFE, orange for MODERATE, red for UNSAFE
+     */
+    private static Color ratingColor(final SafetyRating theRating) {
+        if (theRating == SafetyRating.SAFE) {
+            return SAFE_COLOR;
+        } else if (theRating == SafetyRating.MODERATE) {
+            return HAZARD_COLOR;
+        }
+        return Color.RED;
+    }
+
+    /**
+     * Records an information message in the safety log.
+     *
+     * @param theMessage the message to record
+     */
+    public void showMessage(final String theMessage) {
+        logArea.append("\n" + theMessage + "\n");
+        logArea.setCaretPosition(logArea.getDocument().getLength());
+    }
+
+    /**
+     * Redraws the map, for example after a road or intersection is blocked.
+     */
+    public void refreshMap() {
+        mapPanel.repaint();
+    }
+
+    /**
+     * Removes the highlighted route, hazard markers and safety rating.
+     */
+    public void clearRoute() {
+        mapPanel.setRoute(new ArrayList<>());
+        mapPanel.setSafety(Set.of(), Set.of(), List.of());
+        mySafetyLabel.setText(" ");
+    }
+
+    /**
      * Panel that draws intersections and roads, scaled to fit, and
      * highlights the current route. Blocked intersections and roads are
      * drawn in red.
@@ -308,11 +390,23 @@ public class PlannerDashboard extends JFrame {
         /** Diameter of an intersection circle in pixels. */
         private static final int NODE_SIZE = 16;
 
+        /** Diameter of the orange ring around a hazard intersection, in pixels. */
+        private static final int RING_SIZE = 30;
+
         /** Color used for the highlighted route. */
         private static final Color ROUTE_COLOR = new Color(30, 110, 230);
 
         /** The route currently highlighted, or an empty list. */
         private List<Road> myRoute = new ArrayList<>();
+
+        /** Names of intersections marked as hazards. */
+        private Set<String> myHazardIntersections = new HashSet<>();
+
+        /** IDs of roads marked as hazards. */
+        private Set<Integer> myHazardRoadIds = new HashSet<>();
+
+        /** A safer alternative route drawn dashed, or an empty list. */
+        private List<Road> myAlternative = new ArrayList<>();
 
         /** Creates the map panel with a white background. */
         MapPanel() {
@@ -329,6 +423,21 @@ public class PlannerDashboard extends JFrame {
          */
         void setRoute(final List<Road> theRoute) {
             myRoute = new ArrayList<>(theRoute);
+            repaint();
+        }
+
+        /**
+         * Sets the hazards and the alternative route to show, and redraws.
+         *
+         * @param theIntersections names of intersections with hazards
+         * @param theRoadIds IDs of roads with hazards
+         * @param theAlternative a safer route to draw dashed, or an empty list
+         */
+        void setSafety(final Set<String> theIntersections, final Set<Integer> theRoadIds,
+                       final List<Road> theAlternative) {
+            myHazardIntersections = new HashSet<>(theIntersections);
+            myHazardRoadIds = new HashSet<>(theRoadIds);
+            myAlternative = new ArrayList<>(theAlternative);
             repaint();
         }
 
@@ -355,22 +464,67 @@ public class PlannerDashboard extends JFrame {
                 g2.setColor(road.isBlocked() ? Color.RED : Color.LIGHT_GRAY);
                 drawRoad(g2, road, scale);
             }
+            // Safer alternative route: dashed green, under the main route.
+            g2.setColor(SAFE_COLOR);
+            g2.setStroke(new BasicStroke(4, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND,
+                    10f, new float[] {12f, 8f}, 0f));
+            for (final Road road : myAlternative) {
+                drawRoad(g2, road, scale);
+            }
+
             g2.setColor(ROUTE_COLOR);
             g2.setStroke(new BasicStroke(6));
             for (final Road road : myRoute) {
                 drawRoad(g2, road, scale);
             }
 
+            // Hazard roads: orange on top of the route.
+            g2.setColor(HAZARD_COLOR);
+            g2.setStroke(new BasicStroke(6));
+            for (final Road road : myRoute) {
+                if (myHazardRoadIds.contains(road.getId())) {
+                    drawRoad(g2, road, scale);
+                }
+            }
+
             // Intersections: dark circles, red if blocked, with ID labels.
-            g2.setStroke(new BasicStroke(1));
+            // Hazard intersections get an orange ring.
             g2.setFont(getFont().deriveFont(Font.BOLD, 13f));
             for (final Intersection i : map.getIntersections()) {
                 final int px = toPx(i.getX(), scale);
                 final int py = toPx(i.getY(), scale);
+                if (myHazardIntersections.contains(i.getId())) {
+                    g2.setColor(HAZARD_COLOR);
+                    g2.setStroke(new BasicStroke(4));
+                    g2.drawOval(px - RING_SIZE / 2, py - RING_SIZE / 2, RING_SIZE, RING_SIZE);
+                }
+                g2.setStroke(new BasicStroke(1));
                 g2.setColor(i.isBlocked() ? Color.RED : Color.DARK_GRAY);
                 g2.fillOval(px - NODE_SIZE / 2, py - NODE_SIZE / 2, NODE_SIZE, NODE_SIZE);
                 g2.setColor(Color.BLACK);
                 g2.drawString(i.getId(), px + NODE_SIZE / 2 + 2, py - NODE_SIZE / 2);
+            }
+
+            drawLegend(g2);
+        }
+
+        /**
+         * Draws a small color legend in the bottom-left corner of the map.
+         *
+         * @param theG2 the graphics context
+         */
+        private void drawLegend(final Graphics2D theG2) {
+            final String[] labels = {"Route", "Hazard", "Blocked", "Safer route"};
+            final Color[] colors = {ROUTE_COLOR, HAZARD_COLOR, Color.RED, SAFE_COLOR};
+            theG2.setFont(getFont().deriveFont(Font.PLAIN, 12f));
+            int x = PAD / 2;
+            final int y = getHeight() - PAD / 3;
+            for (int i = 0; i < labels.length; i++) {
+                theG2.setColor(colors[i]);
+                theG2.fillRect(x, y - 9, 14, 8);
+                theG2.setColor(Color.DARK_GRAY);
+                theG2.drawString(labels[i], x + 18, y);
+                x += 18 + theG2.getFontMetrics().stringWidth(labels[i]) + 16;
             }
         }
 
@@ -384,8 +538,8 @@ public class PlannerDashboard extends JFrame {
          */
         private void drawRoad(final Graphics2D theG2, final Road theRoad,
                               final double theScale) {
-            final Intersection start = findIntersection(theRoad.getStart());
-            final Intersection end = findIntersection(theRoad.getEnd());
+            final Intersection start = controller.findIntersection(theRoad.getStart());
+            final Intersection end = controller.findIntersection(theRoad.getEnd());
             if (start != null && end != null) {
                 theG2.drawLine(toPx(start.getX(), theScale), toPx(start.getY(), theScale),
                         toPx(end.getX(), theScale), toPx(end.getY(), theScale));

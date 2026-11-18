@@ -1,5 +1,7 @@
 package model;
-
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 /**
  * A one-way road on the map. Each road goes from a start intersection to an end
  * intersection and is an edge in the MapGraph.
@@ -36,6 +38,7 @@ public final class Road {
     /** Whether this road is currently blocked. */
     private boolean myBlocked;
 
+    private List<int[]> myShape = Collections.emptyList();
     /**
      * Constructs an open road with no traffic delay.
      *
@@ -52,6 +55,7 @@ public final class Road {
                 final double theDistance, final double theSpeedLimit) {
         this(theId, theStart, theEnd, theDistance, theSpeedLimit, 0.0);
     }
+
 
     /**
      * Constructs an open road with the given traffic delay.
@@ -217,6 +221,29 @@ public final class Road {
                     "speed must be a positive number, was " + theSpeed);
         }
         return myDistance / theSpeed + myTrafficDelay;
+    }
+
+
+    public List<int[]> getShape() {
+        final List<int[]> copy = new ArrayList<>();
+        for (final int[] point : myShape) {
+            copy.add(point.clone());
+        }
+        return Collections.unmodifiableList(copy);
+    }
+
+    public void setShape(final List<int[]> theShape) {
+        if (theShape == null) {
+            throw new IllegalArgumentException("shape must not be null");
+        }
+        final List<int[]> copy = new ArrayList<>();
+        for (final int[] point : theShape) {
+            if (point == null || point.length != 2) {
+                throw new IllegalArgumentException("each shape point must be {x, y}");
+            }
+            copy.add(point.clone());
+        }
+        myShape = copy;
     }
 
     /**
