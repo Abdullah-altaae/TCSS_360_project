@@ -136,6 +136,16 @@ class EnvironmentSimulatorTest {
         assertEquals(10.0 / 60.0 + 0.25, travelTime, 0.001);
     }
 
+    /**
+     * Tests that the simulator can change a road's traffic delay.
+     */
+    @Test
+    void testChangeTraffic() {
+        mySimulator.changeTraffic(myRoad, 0.25);
+
+        assertEquals(0.25, myRoad.getTrafficDelay(), 0.001);
+    }
+
     // ==================== BLOCK ROAD TESTS ====================
     /**
      * Tests that a road can be blocked.
@@ -232,6 +242,43 @@ class EnvironmentSimulatorTest {
     void testSetTrafficIntensityAboveMax() {
         assertThrows(IllegalArgumentException.class, () -> {
             mySimulator.setTrafficIntensity(myRoad, 1.1);
+        });
+    }
+
+    @Test
+    void testAverageTrafficIntensity() {
+        Road road1 = new Road(1, "A", "B", 10.0, 60.0);
+        Road road2 = new Road(2, "B", "C", 5.0, 40.0);
+        Road road3 = new Road(3, "C", "D", 8.0, 50.0);
+
+        List<Road> roads = List.of(road1, road2, road3);
+        Route route = new Route("A", "D", roads);
+
+        mySimulator.setTrafficIntensity(road1, 0.2);
+        mySimulator.setTrafficIntensity(road2, 0.5);
+        mySimulator.setTrafficIntensity(road3, 0.8);
+
+        assertEquals(0.5, mySimulator.averageTrafficIntensity(route), 0.001);
+    }
+
+    @Test
+    void testAverageTrafficIntensityEmptyRoute() {
+        Route route = new Route("A", "A", List.of());
+
+        assertEquals(0.0, mySimulator.averageTrafficIntensity(route), 0.001);
+    }
+
+    @Test
+    void testAverageTrafficIntensityNullRoute() {
+        assertThrows(NullPointerException.class, () -> {
+            mySimulator.averageTrafficIntensity(null);
+        });
+    }
+
+    @Test
+    void testSetTrafficIntensityNullRoad() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            mySimulator.setTrafficIntensity(null, 0.2);
         });
     }
 
