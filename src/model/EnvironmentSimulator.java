@@ -260,6 +260,13 @@ public class EnvironmentSimulator {
         return myTrafficIntensities.getOrDefault(theRoad, 0.0);
     }
 
+    /**
+     * Adds a road obstacle to the environment simulation.
+     * If the obstacle is active, its associated road is blocked.
+     *
+     * @param theObstacle the road obstacle to add
+     * @throws NullPointerException if the obstacle is null
+     */
     public void addRoadObstacle(RoadObstacle theObstacle) {
         Objects.requireNonNull(theObstacle, "obstacle must not be null");
         myRoadObstacles.add(theObstacle);
@@ -269,6 +276,14 @@ public class EnvironmentSimulator {
         }
     }
 
+    /**
+     * Deactivates a road obstacle in the environment simulation.
+     * The associated road is unblocked only if no other active
+     * obstacles remain on that road.
+     *
+     * @param theObstacle the road obstacle to deactivate
+     * @throws NullPointerException if the obstacle is null
+     */
     public void removeRoadObstacle(RoadObstacle theObstacle) {
         Objects.requireNonNull(theObstacle, "obstacle must not be null");
         theObstacle.setActive(false);
