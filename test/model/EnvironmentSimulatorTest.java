@@ -367,7 +367,7 @@ class EnvironmentSimulatorTest {
     }
 
     /**
-     * TTests that a moderate traffic intensity is classified as moderate traffic.
+     * Tests that a moderate traffic intensity is classified as moderate traffic.
      */
     @Test
     void testGetTrafficLevelModerate() {
@@ -377,7 +377,7 @@ class EnvironmentSimulatorTest {
     }
 
     /**
-     * TTests that a heavy traffic intensity is classified as heavy traffic.
+     * Tests that a heavy traffic intensity is classified as heavy traffic.
      */
     @Test
     void testGetTrafficLevelHeavy() {

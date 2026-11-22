@@ -76,7 +76,7 @@ public class EnvironmentSimulator {
      * @param theChange the new weather condition
      */
     public void setWeather(WeatherCondition theChange) {
-        myWeather = Objects.requireNonNull(theChange, "Weather cannot be null.");;
+        myWeather = Objects.requireNonNull(theChange, "Weather cannot be null.");
     }
 
     /**
