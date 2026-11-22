@@ -76,7 +76,7 @@ public class EnvironmentSimulator {
      * @param theChange the new weather condition
      */
     public void setWeather(WeatherCondition theChange) {
-        myWeather = theChange;
+        myWeather = Objects.requireNonNull(theChange, "Weather cannot be null.");;
     }
 
     /**
@@ -85,6 +85,7 @@ public class EnvironmentSimulator {
      * @param theRoad the road to block
      */
     public void blockRoad(Road theRoad) {
+        Objects.requireNonNull(theRoad, "Road cannot be null.");
         theRoad.setBlocked(true);
     }
 
@@ -94,6 +95,7 @@ public class EnvironmentSimulator {
      * @param theRoad the road to unblock
      */
     public void unBlockedRoad(Road theRoad) {
+        Objects.requireNonNull(theRoad, "Road cannot be null.");
         theRoad.setBlocked(false);
     }
 
@@ -104,6 +106,7 @@ public class EnvironmentSimulator {
      * @param theDelay the new traffic delay in hours
      */
     public void changeTraffic(Road theRoad, double theDelay) {
+        Objects.requireNonNull(theRoad, "Road cannot be null.");
         theRoad.setTrafficDelay(theDelay);
     }
 
@@ -143,6 +146,7 @@ public class EnvironmentSimulator {
      * @param theIntersection the intersection to block
      */
     public void blockIntersection(Intersection theIntersection) {
+        Objects.requireNonNull(theIntersection, "Intersection cannot be null.");
         theIntersection.setBlocked(true);
     }
 
@@ -152,6 +156,7 @@ public class EnvironmentSimulator {
      * @param theIntersection the intersection to unblock
      */
     public void unblockIntersection(Intersection theIntersection) {
+        Objects.requireNonNull(theIntersection, "Intersection cannot be null.");
         theIntersection.setBlocked(false);
     }
 

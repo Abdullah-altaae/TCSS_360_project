@@ -87,6 +87,16 @@ class EnvironmentSimulatorTest {
     }
 
     /**
+     * Tests that calculating adjusted speed with a null road throws an exception.
+     */
+    @Test
+    void testCalculateAdjustedSpeedNullRoad() {
+        assertThrows(NullPointerException.class, () -> {
+            mySimulator.calculateAdjustedSpeed(null);
+        });
+    }
+
+    /**
      * Tests the adjusted travel time under clear weather conditions.
      */
     @Test
@@ -124,6 +134,16 @@ class EnvironmentSimulatorTest {
     }
 
     /**
+     * Tests that calculating adjusted travel time with a null road throws an exception.
+     */
+    @Test
+    void testCalculateAdjustedTravelTimeNullRoad() {
+        assertThrows(NullPointerException.class, () -> {
+            mySimulator.calculateAdjustedTravelTime(null);
+        });
+    }
+
+    /**
      * Tests that traffic delays are included in the adjusted travel time.
      */
     @Test
@@ -146,6 +166,26 @@ class EnvironmentSimulatorTest {
         assertEquals(0.25, myRoad.getTrafficDelay(), 0.001);
     }
 
+    /**
+     * Tests that changing traffic with a null road throws an exception.
+     */
+    @Test
+    void testChangeTrafficNullRoad() {
+        assertThrows(NullPointerException.class, () -> {
+            mySimulator.changeTraffic(null, 0.25);
+        });
+    }
+
+    /**
+     * Tests that a null weather condition throws an exception.
+     */
+    @Test
+    void testSetWeatherNull() {
+        assertThrows(NullPointerException.class, () -> {
+            mySimulator.setWeather(null);
+        });
+    }
+
     // ==================== BLOCK ROAD TESTS ====================
     /**
      * Tests that a road can be blocked.
@@ -158,6 +198,16 @@ class EnvironmentSimulatorTest {
     }
 
     /**
+     * Tests that blocking a null road throws an exception.
+     */
+    @Test
+    void testBlockRoadNull() {
+        assertThrows(NullPointerException.class, () -> {
+            mySimulator.blockRoad(null);
+        });
+    }
+
+    /**
      * Tests that a blocked road can be unblocked.
      */
     @Test
@@ -166,6 +216,16 @@ class EnvironmentSimulatorTest {
         mySimulator.unBlockedRoad(myRoad);
 
         assertFalse(myRoad.isBlocked());
+    }
+
+    /**
+     * Tests that unblocking a null road throws an exception.
+     */
+    @Test
+    void testUnBlockRoadNull() {
+        assertThrows(NullPointerException.class, () -> {
+            mySimulator.unBlockedRoad(null);
+        });
     }
 
     /**
@@ -245,6 +305,9 @@ class EnvironmentSimulatorTest {
         });
     }
 
+    /**
+     * Tests that the average traffic intensity of a route is calculated correctly.
+     */
     @Test
     void testAverageTrafficIntensity() {
         Road road1 = new Road(1, "A", "B", 10.0, 60.0);
@@ -261,6 +324,9 @@ class EnvironmentSimulatorTest {
         assertEquals(0.5, mySimulator.averageTrafficIntensity(route), 0.001);
     }
 
+    /**
+     * Tests that an empty route returns an average traffic intensity of zero.
+     */
     @Test
     void testAverageTrafficIntensityEmptyRoute() {
         Route route = new Route("A", "A", List.of());
@@ -268,6 +334,9 @@ class EnvironmentSimulatorTest {
         assertEquals(0.0, mySimulator.averageTrafficIntensity(route), 0.001);
     }
 
+    /**
+     * Tests that passing a null route throws a NullPointerException.
+     */
     @Test
     void testAverageTrafficIntensityNullRoute() {
         assertThrows(NullPointerException.class, () -> {
@@ -275,6 +344,9 @@ class EnvironmentSimulatorTest {
         });
     }
 
+    /**
+     * Tests that a null road throws an IllegalArgumentException.
+     */
     @Test
     void testSetTrafficIntensityNullRoad() {
         assertThrows(IllegalArgumentException.class, () -> {
@@ -347,6 +419,16 @@ class EnvironmentSimulatorTest {
     }
 
     /**
+     * Tests that blocking a null intersection throws an exception.
+     */
+    @Test
+    void testBlockIntersectionNull() {
+        assertThrows(NullPointerException.class, () -> {
+            mySimulator.blockIntersection(null);
+        });
+    }
+
+    /**
      * Tests that a blocked intersection can be unblocked.
      */
     @Test
@@ -355,6 +437,16 @@ class EnvironmentSimulatorTest {
         mySimulator.unblockIntersection(myIntersection);
 
         assertFalse(myIntersection.isBlocked());
+    }
+
+    /**
+     * Tests that unblocking a null intersection throws an exception.
+     */
+    @Test
+    void testUnblockIntersectionNull() {
+        assertThrows(NullPointerException.class, () -> {
+            mySimulator.unblockIntersection(null);
+        });
     }
 
     /**
