@@ -50,6 +50,9 @@ public class EnvironmentSimulator {
     /** Stores the traffic intensity of each road. */
     private final Map<Road, Double> myTrafficIntensities;
 
+    /** Stores the current road obstacles. */
+    private final List<RoadObstacle> myRoadObstacles;
+
     /**
      * Constructs an EnvironmentSimulator with clear weather,
      * normal traffic, and no blocked roads.
@@ -60,6 +63,7 @@ public class EnvironmentSimulator {
         myMapGraph = theGraph;
         myWeather = WeatherCondition.CLEAR;
         myTrafficIntensities = new HashMap<>();
+        myRoadObstacles = new ArrayList<>();
     }
     /**
      * Returns the current weather condition.
@@ -255,4 +259,31 @@ public class EnvironmentSimulator {
     public double getTrafficIntensity(Road theRoad) {
         return myTrafficIntensities.getOrDefault(theRoad, 0.0);
     }
+
+    public void addRoadObstacle(RoadObstacle theObstacle) {
+        Objects.requireNonNull(theObstacle, "obstacle must not be null");
+        myRoadObstacles.add(theObstacle);
+
+        if(theObstacle.isActive()) {
+            blockRoad(theObstacle.getRoad());
+        }
+    }
+
+    public void removeRoadObstacle(RoadObstacle theObstacle) {
+        Objects.requireNonNull(theObstacle, "obstacle must not be null");
+        theObstacle.setActive(false);
+        boolean anotherActiveObstacle = false;
+
+        for (RoadObstacle obstacle : myRoadObstacles) {
+            if (obstacle != theObstacle
+                    && obstacle.isActive()
+                    && obstacle.getRoad().equals(theObstacle.getRoad())) {
+                anotherActiveObstacle = true;
+            }
+        }
+        if (!anotherActiveObstacle) {
+            unBlockedRoad(theObstacle.getRoad());
+        }
+    }
+
 }
