@@ -260,3 +260,17 @@ ISSUES I HAD
 1. My branch was out of date with main, and IntelliJ settings files (.iml) blocked switching branches and pulling.
 2. SQLite driver was not set up on my computer, so saving failed until I added libraries.
 3. The database file in the repo used an old table layout, so I deleted it and let the program create a new one.
+
+Abdullah Altaae
+what i Worked on 
+- finished the OsmMapLoader, which loads real map from OpenStreetMap (.osm) files:
+- Reads the map file and keeps only roads cars can drive on, leaving out footpaths, private roads and parking aisles.
+- Turns places where roads meet into intersections, and the road between them into road objects.
+- Handles one-way streets, speed limits from the map data, and roads that run past the edge of the map.
+- Names intersections after their streets (for example "1st Ave & Pine St") and sorts them alphabetically for the drop-downs.
+- Saves each road's curved shape so the map draws it correctly.
+
+Issues I had
+1. Fake intersections. OpenStreetMap splits one street into several pieces, and each split point became an "intersection." 
+The Seattle map had 754 intersections, almost half of them fake, with names like "4th Avenue South (12)." Fixed by joining pieces of the same street back together, which brought it down to 408.
+
