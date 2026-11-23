@@ -237,3 +237,19 @@ i was mostly looking into how this should be done, i spent a good amount of time
 watching how this is going to work. i have an understanding of where thing should be in the future. but i
 still need time to do the work required.
 
+
+Week 4/Iteration 4
+
+Anjana Virani
+What i worked on
+- File > Save Route (Ctrl+S): saves the current route to the SQLite database with a simulation run 
+  (weather, traffic, safety score, normal and simulated travel times) and the hazards found.
+- Normal vs simulated travel time shown in the safety log for every route.
+- Fixes: traffic hazards now appear on the map, no pop-up on automatic re-plans, and a clear message when
+  the start or end is blocked.
+- JUnit tests for saving and the fixes (58 tests passing in PlannerControllerTest).
+
+ISSUES I HAD
+1. My branch was out of date with main, and IntelliJ settings files (.iml) blocked switching branches and pulling.
+2. SQLite driver was not set up on my computer, so saving failed until I added libraries.
+3. The database file in the repo used an old table layout, so I deleted it and let the program create a new one.
