@@ -283,9 +283,14 @@ public class EnvironmentSimulator {
      *
      * @param theObstacle the road obstacle to deactivate
      * @throws NullPointerException if the obstacle is null
+     * @throws IllegalArgumentException if obstacle is not in the simulation.
      */
     public void removeRoadObstacle(RoadObstacle theObstacle) {
         Objects.requireNonNull(theObstacle, "obstacle must not be null");
+        if (!myRoadObstacles.contains(theObstacle)) {
+            throw new IllegalArgumentException("Obstacle is not in the simulation.");
+        }
+
         theObstacle.setActive(false);
         boolean anotherActiveObstacle = false;
 
@@ -300,5 +305,15 @@ public class EnvironmentSimulator {
             unBlockedRoad(theObstacle.getRoad());
         }
     }
+
+    /**
+     * Returns a copy of all road obstacles registered in the simulation.
+     *
+     * @return a list of registered road obstacles
+     */
+    public List<RoadObstacle> getRoadObstacles() {
+        return new ArrayList<>(myRoadObstacles);
+    }
+
 
 }

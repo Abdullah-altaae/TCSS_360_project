@@ -470,4 +470,99 @@ class EnvironmentSimulatorTest {
 
         assertFalse(intersections.contains(myIntersection));
     }
+
+    // ==================== ROAD OBSTACLE TESTS ====================
+    /**
+     * Tests that adding an active road obstacle blocks its associated road.
+     */
+    @Test
+    void testAddActiveRoadObstacle() {
+        RoadObstacle obstacle = new RoadObstacle(
+                myRoad, RoadObstacle.ObstacleType.ACCIDENT);
+
+        mySimulator.addRoadObstacle(obstacle);
+
+        assertTrue(myRoad.isBlocked());
+    }
+
+    /**
+     * Tests that adding an inactive road obstacle does not block the road.
+     */
+    @Test
+    void testAddInactiveRoadObstacle() {
+        RoadObstacle obstacle = new RoadObstacle(
+                myRoad, RoadObstacle.ObstacleType.DEBRIS);
+
+        obstacle.setActive(false);
+        mySimulator.addRoadObstacle(obstacle);
+
+        assertFalse(myRoad.isBlocked());
+    }
+
+    /**
+     * Tests that removing an active road obstacle unblocks the road.
+     */
+    @Test
+    void testRemoveRoadObstacle() {
+        RoadObstacle obstacle = new RoadObstacle(
+                myRoad, RoadObstacle.ObstacleType.CONSTRUCTION);
+
+        mySimulator.addRoadObstacle(obstacle);
+        mySimulator.removeRoadObstacle(obstacle);
+
+        assertFalse(myRoad.isBlocked());
+        assertFalse(obstacle.isActive());
+    }
+
+    /**
+     * Tests that removing one obstacle does not unblock a road
+     * when another active obstacle remains on the same road.
+     */
+    @Test
+    void testRemoveObstacleWithAnotherActiveObstacle() {
+        RoadObstacle accident = new RoadObstacle(
+                myRoad, RoadObstacle.ObstacleType.ACCIDENT);
+
+        RoadObstacle construction = new RoadObstacle(
+                myRoad, RoadObstacle.ObstacleType.CONSTRUCTION);
+
+        mySimulator.addRoadObstacle(accident);
+        mySimulator.addRoadObstacle(construction);
+
+        mySimulator.removeRoadObstacle(accident);
+
+        assertTrue(myRoad.isBlocked());
+        assertFalse(accident.isActive());
+        assertTrue(construction.isActive());
+    }
+
+    /**
+     * Tests that removing an unknown obstacle that is not registered
+     * in the simulator throws an IllegalArgumentException.
+     */
+    @Test
+    void testRemoveUnregisteredObstacle() {
+        RoadObstacle obstacle = new RoadObstacle(
+                myRoad, RoadObstacle.ObstacleType.DEBRIS);
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            mySimulator.removeRoadObstacle(obstacle);
+        });
+    }
+
+    /**
+     * Tests that getRoadObstacles returns a copy of the registered obstacles.
+     */
+    @Test
+    void testGetRoadObstaclesReturnsCopy() {
+        RoadObstacle obstacle = new RoadObstacle(
+                myRoad, RoadObstacle.ObstacleType.ACCIDENT);
+        mySimulator.addRoadObstacle(obstacle);
+
+        List<RoadObstacle> obstacles = mySimulator.getRoadObstacles();
+
+        obstacles.clear();
+
+        assertEquals(1, mySimulator.getRoadObstacles().size());
+    }
 }
