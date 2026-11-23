@@ -77,7 +77,14 @@ What I worked on:
   It uses hazards described in the Hazard class instead of creating hazards on its own (the way I previously had).
 - Also added methods that accurately calculates the safety penalties by calling the methods from the Hazard class.
 - Added a method that converts numerical safety ratings to descriptive rating for user to understand easily.
-- Added tests for EnvironmentSimulator class. 
+- Added tests for EnvironmentSimulator class.
+
+Week 4:
+What I worked on:
+- Created a RoadObstacle class that handles obtsacles that block the road. I added a few methods that in EnvironmentSimulator class
+  that also simulates these obstacles in the program.
+- I editted older tests and added more unit tests to EnvironmentSimulator.
+- Added tests for RoadObstacle class. 
 
 
 
