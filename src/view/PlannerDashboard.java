@@ -9,6 +9,7 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -28,6 +29,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import javax.swing.KeyStroke;
 
 import controller.PlannerController;
 import controller.PlannerController.SafetyReport;
@@ -56,7 +58,7 @@ import model.SafetyRating;
  * </p>
  *
  * @author Anjana Virani
- * @version 15 November 2026
+ * @version 21 November 2026
  */
 public class PlannerDashboard extends JFrame {
 
@@ -134,13 +136,15 @@ public class PlannerDashboard extends JFrame {
         fileMenu.setMnemonic(KeyEvent.VK_F);
 
         final JMenuItem saveItem = new JMenuItem("Save Route");
-        saveItem.addActionListener(theEvent -> JOptionPane.showMessageDialog(this,
-                "Saving routes will be available once the database is connected.",
-                "Save Route", JOptionPane.INFORMATION_MESSAGE));
+        saveItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S,
+                InputEvent.CTRL_DOWN_MASK));
+        saveItem.addActionListener(theEvent -> controller.handleSaveRoute());
 
-        final JMenuItem loadItem = new JMenuItem("Load Route");
+        final JMenuItem loadItem = new JMenuItem("Load Route...");
+        loadItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O,
+                InputEvent.CTRL_DOWN_MASK));
         loadItem.addActionListener(theEvent -> JOptionPane.showMessageDialog(this,
-                "Loading routes will be available once the database is connected.",
+                "Loading saved routes will be added in the next version.",
                 "Load Route", JOptionPane.INFORMATION_MESSAGE));
 
         final JMenuItem exitItem = new JMenuItem("Exit");
@@ -161,7 +165,7 @@ public class PlannerDashboard extends JFrame {
         aboutItem.addActionListener(theEvent -> JOptionPane.showMessageDialog(this,
                 "Self-Driving Car Route Planner and Safety Checker\n"
                         + "Team: Abdullah, Felix, Allia, Anjana\n"
-                        + "Version: Iteration 3",
+                        + "Version: Iteration 4",
                 "About", JOptionPane.INFORMATION_MESSAGE));
 
         final JMenuItem instructionsItem = new JMenuItem("Instructions");
@@ -181,7 +185,9 @@ public class PlannerDashboard extends JFrame {
                         + "  Blue = your route\n"
                         + "  Orange = hazard (sharp turn, traffic)\n"
                         + "  Red = blocked\n"
-                        + "  Dashed green = safer alternative route",
+                        + "  Dashed green = safer alternative route\n\n"
+                        + "File > Save Route (Ctrl+S) saves the current route with\n"
+                        + "its conditions, travel times and hazards.",
                 "Instructions", JOptionPane.INFORMATION_MESSAGE));
 
         helpMenu.add(aboutItem);
@@ -263,7 +269,6 @@ public class PlannerDashboard extends JFrame {
         mapPanel.setRoute(theRoute);
 
         double totalDistance = 0;
-        double totalMinutes = 0;
         final StringBuilder sb = new StringBuilder();
         sb.append("\nRoute from ").append(theRoute.get(0).getStart())
                 .append(" to ").append(theRoute.get(theRoute.size() - 1).getEnd())
@@ -271,7 +276,6 @@ public class PlannerDashboard extends JFrame {
 
         for (final Road road : theRoute) {
             totalDistance += road.getDistance();
-            totalMinutes += controller.getAdjustedTravelTime(road) * MINUTES_PER_HOUR;
             sb.append(String.format("  %s -> %s  %.1f mi @ %.0f mph%s%s%n",
                     road.getStart(), road.getEnd(), road.getDistance(),
                     road.getSpeedLimit(),
@@ -281,8 +285,11 @@ public class PlannerDashboard extends JFrame {
                             : "",
                     road.isBlocked() ? "  (BLOCKED)" : ""));
         }
-        sb.append(String.format("Total: %.1f mi, about %.1f minutes%n",
-                totalDistance, totalMinutes));
+        sb.append(String.format("Total: %.1f mi%n", totalDistance));
+        final double normal = controller.getNormalTime(theRoute) * MINUTES_PER_HOUR;
+        final double simulated = controller.getSimulatedTime(theRoute) * MINUTES_PER_HOUR;
+        sb.append(String.format("Normal conditions: %.1f min | current conditions: "
+                + "%.1f min (%+.1f min)%n", normal, simulated, simulated - normal));
 
         logArea.append(sb.toString());
         logArea.setCaretPosition(logArea.getDocument().getLength());
@@ -349,6 +356,17 @@ public class PlannerDashboard extends JFrame {
             return HAZARD_COLOR;
         }
         return Color.RED;
+    }
+
+    /**
+     * Records an error in the safety log without a pop-up. Used for errors
+     * from automatic re-planning, so the user is not interrupted.
+     *
+     * @param theMessage the error message to record
+     */
+    public void logError(final String theMessage) {
+        logArea.append("\nERROR: " + theMessage + "\n");
+        logArea.setCaretPosition(logArea.getDocument().getLength());
     }
 
     /**
