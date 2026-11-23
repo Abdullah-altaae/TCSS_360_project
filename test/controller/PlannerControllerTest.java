@@ -18,17 +18,11 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
+import model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import model.EnvironmentSimulator;
 import model.EnvironmentSimulator.WeatherCondition;
-import model.Hazard;
-import model.Intersection;
-import model.MapGraph;
-import model.Road;
-import model.RoutePlanner;
-import model.SafetyRating;
 
 /**
  * Unit tests for {@link PlannerController}.
@@ -156,37 +150,37 @@ class PlannerControllerTest {
     /** A route between neighbors is one road long. */
     @Test
     void testComputeRouteOneRoad() {
-        final List<Road> route = myController.computeRoute("A", "B");
-        assertEquals(1, route.size());
-        assertEquals("A", route.get(0).getStart());
-        assertEquals("B", route.get(0).getEnd());
+        final Route route = myController.computeRoute("A", "B");
+        assertEquals(1, route.getPath().size());
+        assertEquals("A", route.getPath().get(0).getStart());
+        assertEquals("B", route.getPath().get(0).getEnd());
     }
 
     /** A route from A to C starts at A, ends at C and passes through B. */
     @Test
     void testComputeRouteTwoRoads() {
-        final List<Road> route = myController.computeRoute("A", "C");
-        assertEquals(2, route.size());
-        assertEquals("A", route.get(0).getStart());
-        assertEquals("C", route.get(route.size() - 1).getEnd());
+        final Route route = myController.computeRoute("A", "C");
+        assertEquals(2, route.getPath().size());
+        assertEquals("A", route.getPath().get(0).getStart());
+        assertEquals("C", route.getPath().get(route.getPath().size() - 1).getEnd());
     }
 
     /** Each road in a route starts where the previous road ended. */
     @Test
     void testComputeRouteIsConnected() {
-        final List<Road> route = myController.computeRoute("A", "C");
-        for (int i = 1; i < route.size(); i++) {
-            assertEquals(route.get(i - 1).getEnd(), route.get(i).getStart());
+        final Route route = myController.computeRoute("A", "C");
+        for (int i = 1; i < route.getPath().size(); i++) {
+            assertEquals(route.getPath().get(i - 1).getEnd(), route.getPath().get(i).getStart());
         }
     }
 
     /** Routes work in the reverse direction too. */
     @Test
     void testComputeRouteReverse() {
-        final List<Road> route = myController.computeRoute("C", "A");
-        assertFalse(route.isEmpty());
-        assertEquals("C", route.get(0).getStart());
-        assertEquals("A", route.get(route.size() - 1).getEnd());
+        final Route route = myController.computeRoute("C", "A");
+        assertFalse(route.getPath().isEmpty());
+        assertEquals("C", route.getPath().get(0).getStart());
+        assertEquals("A", route.getPath().get(route.getPath().size() - 1).getEnd());
     }
 
     // ---------- computeRoute: invalid input ----------
@@ -229,7 +223,7 @@ class PlannerControllerTest {
         assertTrue(ex.getMessage().contains("Z"));
     }
 
-    /** An intersection that no road reaches has no route. */
+    /** An intersection that no road reaches has no route.getPath(). */
     @Test
     void testComputeRouteNoRoute() {
         final IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
@@ -381,7 +375,7 @@ class PlannerControllerTest {
     @Test
     void testCheckSafetyNoHazards() {
         final PlannerController.SafetyReport report =
-                myController.checkSafety(myController.computeRoute("A", "C"));
+                myController.checkSafety(myController.computeRoute("A", "C").getPath());
         assertEquals(100, report.getScore());
         assertEquals(SafetyRating.SAFE, report.getRating());
         assertFalse(report.hasHazards());
@@ -393,7 +387,7 @@ class PlannerControllerTest {
     void testCheckSafetySnow() {
         myController.setWeather(WeatherCondition.SNOWY);
         final PlannerController.SafetyReport report =
-                myController.checkSafety(myController.computeRoute("A", "C"));
+                myController.checkSafety(myController.computeRoute("A", "C").getPath());
         assertTrue(report.getScore() < 100);
         assertTrue(report.hasHazards());
         assertTrue(report.getWarnings().get(0).contains("Snow"));
@@ -402,9 +396,9 @@ class PlannerControllerTest {
     /** A blocked road on the route makes it UNSAFE and is marked by ID. */
     @Test
     void testCheckSafetyBlockedRoad() {
-        final List<Road> route = myController.computeRoute("A", "C");
+        final Route route = myController.computeRoute("A", "C");
         myController.setRoadBlocked(2, true);
-        final PlannerController.SafetyReport report = myController.checkSafety(route);
+        final PlannerController.SafetyReport report = myController.checkSafety(route.getPath());
         assertEquals(0, report.getScore());
         assertEquals(SafetyRating.UNSAFE, report.getRating());
         assertTrue(report.getHazardRoadIds().contains(2));
@@ -413,9 +407,9 @@ class PlannerControllerTest {
     /** A blocked intersection on the route is marked by name. */
     @Test
     void testCheckSafetyBlockedIntersection() {
-        final List<Road> route = myController.computeRoute("A", "C");
+        final Route route = myController.computeRoute("A", "C");
         myController.setIntersectionBlocked("B", true);
-        final PlannerController.SafetyReport report = myController.checkSafety(route);
+        final PlannerController.SafetyReport report = myController.checkSafety(route.getPath());
         assertEquals(SafetyRating.UNSAFE, report.getRating());
         assertTrue(report.getHazardIntersections().contains("B"));
     }
@@ -440,7 +434,7 @@ class PlannerControllerTest {
                 map, new RoutePlanner(map, simulator), simulator);
 
         final PlannerController.SafetyReport report =
-                controller.checkSafety(controller.computeRoute("A", "C"));
+                controller.checkSafety(controller.computeRoute("A", "C").getPath());
         assertTrue(report.getHazardIntersections().contains("B"));
         assertTrue(report.getScore() < 100);
     }
@@ -466,10 +460,10 @@ class PlannerControllerTest {
         final PlannerController controller = new PlannerController(
                 map, new RoutePlanner(map, simulator), simulator);
 
-        final List<Road> fastest = controller.computeRoute("S", "E");
-        assertEquals("P", fastest.get(0).getEnd());
+        final Route fastest = controller.computeRoute("S", "E");
+        assertEquals("P", fastest.getPath().get(0).getEnd());
 
-        final PlannerController.SafetyReport report = controller.checkSafety(fastest);
+        final PlannerController.SafetyReport report = controller.checkSafety(fastest.getPath());
         assertTrue(report.hasAlternative());
         assertEquals("Q", report.getAlternative().get(0).getEnd());
         assertTrue(report.getAlternativeScore() > report.getScore());
@@ -500,7 +494,7 @@ class PlannerControllerTest {
     /** In clear weather with no traffic, simulated time equals normal time. */
     @Test
     void testSimulatedTimeEqualsNormalWhenClear() {
-        final List<Road> route = myController.computeRoute("A", "C");
+        final List<Road> route = myController.computeRoute("A", "C").getPath();
         assertEquals(myController.getNormalTime(route),
                 myController.getSimulatedTime(route), 1e-9);
     }
@@ -508,7 +502,7 @@ class PlannerControllerTest {
     /** Rain makes the simulated time longer than the normal time. */
     @Test
     void testSimulatedTimeLongerInRain() {
-        final List<Road> route = myController.computeRoute("A", "C");
+        final List<Road> route = myController.computeRoute("A", "C").getPath();
         myController.setWeather(WeatherCondition.RAINY);
         assertTrue(myController.getSimulatedTime(route) > myController.getNormalTime(route));
     }
@@ -535,7 +529,7 @@ class PlannerControllerTest {
     /** Heavy traffic on a road of the route is reported and marked by road ID. */
     @Test
     void testHeavyTrafficHazardIsLocated() {
-        final List<Road> route = myController.computeRoute("A", "C");
+        final List<Road> route = myController.computeRoute("A", "C").getPath();
         myController.setTrafficDelay(route.get(0).getId(), 20);
         final PlannerController.SafetyReport report = myController.checkSafety(route);
         assertTrue(report.getHazardRoadIds().contains(route.get(0).getId()));
@@ -546,7 +540,7 @@ class PlannerControllerTest {
     /** Rain with moderate traffic is reported as rain combined with traffic. */
     @Test
     void testRainAndTrafficHazard() {
-        final List<Road> route = myController.computeRoute("A", "C");
+        final List<Road> route = myController.computeRoute("A", "C").getPath();
         myController.setWeather(WeatherCondition.RAINY);
         myController.setTrafficDelay(route.get(0).getId(), 10);
         final PlannerController.SafetyReport report = myController.checkSafety(route);
@@ -595,11 +589,13 @@ class PlannerControllerTest {
     /** Without a database, saving is not available. */
     @Test
     void testNoDatabase() {
-        assertFalse(myController.initializeDatabase());
-        assertFalse(myController.hasDatabase());
-        assertNotNull(myController.getDatabaseProblem());
+        final PlannerController controller =
+                new PlannerController(myMap, myPlanner, mySimulator, null);
+        assertFalse(controller.initializeDatabase());
+        assertFalse(controller.hasDatabase());
+        assertNotNull(controller.getDatabaseProblem());
         assertThrows(IllegalStateException.class,
-                () -> myController.saveRoute(myController.computeRoute("A", "C")));
+                () -> controller.saveRoute(controller.computeRoute("A", "C").getPath()));
     }
 
     /** A new database is ready to use. */
@@ -614,7 +610,7 @@ class PlannerControllerTest {
     @Test
     void testSaveRoute() throws IOException, SQLException {
         final PlannerController controller = databaseController();
-        final int id = controller.saveRoute(controller.computeRoute("A", "C"));
+        final int id = controller.saveRoute(controller.computeRoute("A", "C").getPath());
         assertTrue(id >= 1);
         assertEquals(1.0, queryNumber("SELECT COUNT(*) FROM routes"), 1e-9);
         assertEquals(2.0, queryNumber("SELECT distance FROM routes WHERE route_id = " + id),
@@ -627,7 +623,7 @@ class PlannerControllerTest {
     @Test
     void testSaveStoresSimulationRun() throws IOException, SQLException {
         final PlannerController controller = databaseController();
-        final List<Road> route = controller.computeRoute("A", "C");
+        final List<Road> route = controller.computeRoute("A", "C").getPath();
         controller.setWeather(WeatherCondition.RAINY);
         final int id = controller.saveRoute(route);
 
@@ -645,7 +641,7 @@ class PlannerControllerTest {
     @Test
     void testSaveStoresHazards() throws IOException, SQLException {
         final PlannerController controller = databaseController();
-        final List<Road> route = controller.computeRoute("A", "C");
+        final List<Road> route = controller.computeRoute("A", "C").getPath();
         controller.setWeather(WeatherCondition.SNOWY);
         controller.saveRoute(route);
         assertEquals(1.0, queryNumber("SELECT COUNT(*) FROM hazards "
@@ -656,7 +652,7 @@ class PlannerControllerTest {
     @Test
     void testSaveSafeRouteHasNoHazards() throws IOException, SQLException {
         final PlannerController controller = databaseController();
-        controller.saveRoute(controller.computeRoute("A", "C"));
+        controller.saveRoute(controller.computeRoute("A", "C").getPath());
         assertEquals(0.0, queryNumber("SELECT COUNT(*) FROM hazards"), 1e-9);
     }
 
@@ -665,5 +661,18 @@ class PlannerControllerTest {
     void testSaveEmptyRoute() throws IOException {
         final PlannerController controller = databaseController();
         assertThrows(IllegalArgumentException.class, () -> controller.saveRoute(List.of()));
+    }
+
+    /** Saving the same route twice keeps one route but adds a second simulation run. */
+    @Test
+    void testSaveSameRouteTwice() throws IOException, SQLException {
+        final PlannerController controller = databaseController();
+        final List<Road> route = controller.computeRoute("A", "C").getPath();
+        final int first = controller.saveRoute(route);
+        controller.setWeather(WeatherCondition.RAINY);
+        final int second = controller.saveRoute(route);
+        assertEquals(first, second);
+        assertEquals(1.0, queryNumber("SELECT COUNT(*) FROM routes"), 1e-9);
+        assertEquals(2.0, queryNumber("SELECT COUNT(*) FROM simulation_runs"), 1e-9);
     }
 }

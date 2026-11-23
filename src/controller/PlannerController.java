@@ -3,22 +3,15 @@ package controller;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-import model.EnvironmentSimulator;
+import model.*;
 import model.EnvironmentSimulator.WeatherCondition;
-import model.Hazard;
-import model.Intersection;
-import model.MapGraph;
-import model.Road;
-import model.Route;
-import model.RouteDatabase;
-import model.RoutePlanner;
-import model.SafetyChecker;
-import model.SafetyRating;
 import view.PlannerDashboard;
 
 /**
@@ -68,6 +61,9 @@ public class PlannerController {
     /** Number of minutes in one hour. */
     private static final double MINUTES_PER_HOUR = 60.0;
 
+    /** The Url used to create the RouteDatabase object. */
+    private static final String myDBUrl = "jdbc:sqlite:CarPlanner_Database.db";
+
     /** The city map. */
     private final MapGraph myMap;
 
@@ -89,9 +85,6 @@ public class PlannerController {
     /** Why the database cannot be used, or null if it can. */
     private String myDatabaseProblem = "No database was set up.";
 
-    /** The last route shown to the user, or an empty list. */
-    private List<Road> myLastRoute = List.of();
-
     /** The view that displays results, or null until it is set. */
     private PlannerDashboard myView;
 
@@ -101,9 +94,19 @@ public class PlannerController {
     /** The end of the last successfully planned route, or null. */
     private String myLastEndId;
 
+    /** The last route shown to the user, or null. */
+    private Route myLastRoute;
+
+    /** The last simulation run that was created or saved, or null. */
+    private SimulationRun myLastSimulationRun;
+
+    /** The last hazard that was selected or saved, or null. */
+    private Hazard myLastHazard;
+
     /**
-     * Creates a controller for the given map, route planner and simulator,
-     * with no database. Saving and loading routes is not available.
+     * Creates a controller for the given map, route planner and simulator
+     * that saves to the default database file. Call
+     * {@link #initializeDatabase()} before saving routes.
      *
      * @param theMap the city map
      * @param thePlanner the route planner
@@ -112,7 +115,7 @@ public class PlannerController {
      */
     public PlannerController(final MapGraph theMap, final RoutePlanner thePlanner,
                              final EnvironmentSimulator theSimulator) {
-        this(theMap, thePlanner, theSimulator, null);
+        this(theMap, thePlanner, theSimulator, myDBUrl);
     }
 
     /**
@@ -241,7 +244,7 @@ public class PlannerController {
      *                                  if both names are the same, or if no
      *                                  route exists
      */
-    public List<Road> computeRoute(final String theStartId, final String theEndId) {
+    public Route computeRoute(final String theStartId, final String theEndId) {
         if (theStartId == null || theEndId == null) {
             throw new IllegalArgumentException(
                     "Please choose both a start and an end intersection.");
@@ -271,7 +274,7 @@ public class PlannerController {
             throw new IllegalArgumentException(
                     "No route found from " + theStartId + " to " + theEndId + ".");
         }
-        return route;
+        return new Route(theStartId, theEndId, route);
     }
 
     /**
@@ -303,14 +306,24 @@ public class PlannerController {
             throw new IllegalStateException("setView must be called before planRoute");
         }
         try {
-            final List<Road> route = computeRoute(theStartId, theEndId);
-            showRouteInView(route);
+            Route route = computeRoute(theStartId, theEndId);
+            if (myLastRoute != null && myLastRoute.isSaved()
+                    && myLastRoute.getStart().equals(theStartId)
+                    && myLastRoute.getEnd().equals(theEndId)) {
+                // Replanning a saved route (for example after the weather
+                // changes) keeps its ID, so saving it updates the saved
+                // route instead of adding a duplicate.
+                route = route.withId(myLastRoute.getId());
+            }
+            myLastRoute = route;
             myLastStartId = theStartId;
             myLastEndId = theEndId;
+            myView.showRoute(route.getPath());
+            myView.showSafetyReport(checkSafety(route.getPath()));
         } catch (final RuntimeException ex) {
             final String message = ex instanceof IllegalArgumentException
                     ? ex.getMessage() : "Route planning failed: " + ex.getMessage();
-            myLastRoute = List.of();
+            myLastRoute = null;
             myView.clearRoute();
             if (theAutomatic) {
                 myView.logError(message);
@@ -318,28 +331,6 @@ public class PlannerController {
                 myView.showError(message);
             }
         }
-    }
-
-    /**
-     * Shows a route and its safety report in the view and remembers it as
-     * the last route, so it can be saved.
-     *
-     * @param theRoute the route to show
-     */
-    private void showRouteInView(final List<Road> theRoute) {
-        myLastRoute = List.copyOf(theRoute);
-        myView.showRoute(theRoute);
-        myView.showSafetyReport(checkSafety(theRoute));
-    }
-
-    /**
-     * Returns the last route shown to the user.
-     *
-     * @return an unmodifiable list of the route's roads, or an empty list if
-     *         no route is shown
-     */
-    public List<Road> getLastRoute() {
-        return myLastRoute;
     }
 
     /**
@@ -411,7 +402,9 @@ public class PlannerController {
     /**
      * Saves a route to the database together with one simulation run under the
      * current conditions (weather, average traffic, safety score, normal and
-     * simulated travel times) and every hazard found on it.
+     * simulated travel times) and every hazard found on it. If the route is
+     * the same as the last route and that one is already saved, it is not
+     * saved again; only a new simulation run is added for it.
      *
      * @param theRoute the route to save
      * @return the saved route's database ID
@@ -428,17 +421,17 @@ public class PlannerController {
         }
         final Route route = new Route(theRoute.get(0).getStart(),
                 theRoute.get(theRoute.size() - 1).getEnd(), theRoute);
-
-        final int routeId = myDatabase.saveRoute(route.getStart(), route.getEnd(),
-                route.getPathString(), route.getDistance());
-        final int simId = myDatabase.saveSimulationRun(routeId,
-                mySimulator.averageTrafficIntensity(route), mySimulator.getWeather(),
+        if (myLastRoute == null || routeChanged(myLastRoute, route)) {
+            myLastRoute = route;
+        }
+        storeRoute();
+        myLastSimulationRun = new SimulationRun(myLastRoute,
+                mySimulator.averageTrafficIntensity(myLastRoute), mySimulator.getWeather(),
+                mySafetyChecker.findHazards(theRoute),
                 mySafetyChecker.calculateSafetyRating(theRoute),
                 getNormalTime(theRoute), getSimulatedTime(theRoute));
-        for (final Hazard hazard : mySafetyChecker.findHazards(theRoute)) {
-            myDatabase.saveHazard(simId, hazard.getType(), hazard.getPenalty());
-        }
-        return routeId;
+        storeSimulationRun();
+        return myLastRoute.getId();
     }
 
     /**
@@ -450,15 +443,14 @@ public class PlannerController {
             myView.showError("Routes cannot be saved. " + myDatabaseProblem);
             return;
         }
-        if (myLastRoute.isEmpty()) {
+        if (myLastRoute == null) {
             myView.showError("Plan a route before saving it.");
             return;
         }
         try {
-            final int id = saveRoute(myLastRoute);
+            final int id = saveRoute(myLastRoute.getPath());
             myView.showMessage("Route saved as #" + id + " ("
-                    + myLastRoute.get(0).getStart() + " -> "
-                    + myLastRoute.get(myLastRoute.size() - 1).getEnd()
+                    + myLastRoute.getStart() + " -> " + myLastRoute.getEnd()
                     + ", weather " + getWeather() + ").");
         } catch (final SQLException ex) {
             myView.showError("Could not save the route: " + ex.getMessage()
@@ -476,6 +468,224 @@ public class PlannerController {
         if (!myDatabaseReady) {
             throw new IllegalStateException("The database is not ready: " + myDatabaseProblem);
         }
+    }
+
+    /** What happened when the controller was asked to save an object. */
+    public enum SaveResult {
+        /** The object was new and was inserted into the database. */
+        SAVED,
+        /** The object was already saved, had changes, and was updated. */
+        UPDATED,
+        /** The object was already saved and matched the database, so nothing was written. */
+        NO_CHANGES
+    }
+
+    public void setLastRoute(final Route theRoute) {
+        myLastRoute = Objects.requireNonNull(theRoute, "route must not be null");
+    }
+
+    /**
+     * Returns the last route shown to the user.
+     *
+     * @return the last route, or null if no route is shown
+     */
+    public Route getLastRoute() {
+        return myLastRoute;
+    }
+
+    public void setLastSimulationRun(final SimulationRun theRun) {
+        myLastSimulationRun = Objects.requireNonNull(theRun, "simulation run must not be null");
+    }
+
+    public SimulationRun getLastSimulationRun() {
+        return myLastSimulationRun;
+    }
+
+    public void setLastHazard(final Hazard theHazard) {
+        myLastHazard = Objects.requireNonNull(theHazard, "hazard must not be null");
+    }
+
+    public Hazard getLastHazard() {
+        return myLastHazard;
+    }
+
+    /**
+     * Saves the last planned route. A new route is inserted, and a saved
+     * route is updated only if it differs from the database copy. This
+     * method does not touch the view, so it can be unit tested.
+     *
+     * @return whether the route was saved, updated or unchanged
+     * @throws IllegalStateException if there is no route to save
+     * @throws SQLException if the database cannot be read or written
+     */
+    public SaveResult storeRoute() throws SQLException {
+        if (myLastRoute == null) {
+            throw new IllegalStateException("Create a route before attempting to save.");
+        }
+        requireDatabase();
+        final Route route = myLastRoute;
+        if (!route.isSaved()) {
+            final int routeId = myDatabase.saveRoute(route.getStart(), route.getEnd(),
+                    route.getPathString(), route.getDistance());
+            myLastRoute = route.withId(routeId);
+            return SaveResult.SAVED;
+        }
+        final Route stored = myDatabase.loadRoute(route.getId(), myMap);
+        if (!routeChanged(stored, route)) {
+            return SaveResult.NO_CHANGES;
+        }
+        myDatabase.updateRoute(route.getId(), route.getStart(), route.getEnd(),
+                route.getPathString(), route.getDistance());
+        return SaveResult.UPDATED;
+    }
+
+    /**
+     * Saves the last simulation run and its hazards. A new run is inserted
+     * with its hazards, and a saved run is updated only if it or its hazards
+     * differ from the database copy. The run's route must be saved first.
+     * This method does not touch the view, so it can be unit tested.
+     *
+     * @return whether the run was saved, updated or unchanged
+     * @throws IllegalStateException if there is no run to save, or its route
+     *                               has not been saved
+     * @throws SQLException if the database cannot be read or written
+     */
+    public SaveResult storeSimulationRun() throws SQLException {
+        if (myLastSimulationRun == null) {
+            throw new IllegalStateException(
+                    "Run a simulation before attempting to save it.");
+        }
+        requireDatabase();
+        final SimulationRun run = myLastSimulationRun;
+        final Route savedRoute = findSavedRoute(run.getRoute());
+
+        if (!run.isSaved()) {
+            final int simId = myDatabase.saveSimulationRun(savedRoute.getId(),
+                    run.getAverageTraffic(), run.getWeather(), run.getSafetyRating(),
+                    run.getNormalTime(), run.getSimulatedTime());
+            final List<Hazard> savedHazards = myDatabase.replaceHazards(simId, run.getHazards());
+            myLastSimulationRun = run.withSavedData(simId, savedRoute, savedHazards);
+            return SaveResult.SAVED;
+        }
+
+        final SimulationRun stored = myDatabase.loadSimulationRun(run.getId(), myMap);
+        final boolean runChanged = simulationRunChanged(stored, run, savedRoute.getId());
+        final boolean hazardsChanged = hazardsChanged(stored.getHazards(), run.getHazards());
+        if (!runChanged && !hazardsChanged) {
+            return SaveResult.NO_CHANGES;
+        }
+        if (runChanged) {
+            myDatabase.updateSimulationRun(run.getId(), savedRoute.getId(),
+                    run.getAverageTraffic(), run.getWeather(), run.getSafetyRating(),
+                    run.getNormalTime(), run.getSimulatedTime());
+        }
+        final List<Hazard> hazards = hazardsChanged
+                ? myDatabase.replaceHazards(run.getId(), run.getHazards())
+                : stored.getHazards();
+        myLastSimulationRun = run.withSavedData(run.getId(), savedRoute, hazards);
+        return SaveResult.UPDATED;
+    }
+
+    /**
+     * Saves the last selected hazard. A new hazard is inserted, and a saved
+     * hazard is updated only if it differs from the database copy. This
+     * method does not touch the view, so it can be unit tested.
+     *
+     * @return whether the hazard was saved, updated or unchanged
+     * @throws IllegalStateException if there is no hazard to save, or its
+     *                               simulation run has not been saved
+     * @throws SQLException if the database cannot be read or written
+     */
+    public SaveResult storeHazard() throws SQLException {
+        if (myLastHazard == null) {
+            throw new IllegalStateException("Select a hazard before attempting to save.");
+        }
+        final Hazard hazard = myLastHazard;
+        if (hazard.getSimId() == Hazard.UNSAVED_ID) {
+            throw new IllegalStateException(
+                    "Save the hazard's simulation run before saving the hazard.");
+        }
+        requireDatabase();
+        if (!hazard.isSaved()) {
+            final int hazardId = myDatabase.saveHazard(hazard.getSimId(), hazard.getType(),
+                    hazard.getPenalty());
+            myLastHazard = hazard.withIds(hazardId, hazard.getSimId());
+            return SaveResult.SAVED;
+        }
+        final Hazard stored = myDatabase.loadHazard(hazard.getId());
+        if (!hazardChanged(stored, hazard)) {
+            return SaveResult.NO_CHANGES;
+        }
+        myDatabase.updateHazard(hazard.getId(), hazard.getSimId(), hazard.getType(),
+                hazard.getPenalty());
+        return SaveResult.UPDATED;
+    }
+
+    /**
+     * Returns the saved version of a simulation run's route. The run may hold
+     * an unsaved copy of a route that has since been saved: the route was
+     * planned, the run was created, and then the route was saved, which gave
+     * {@link #myLastRoute} an ID but left the run's copy without one. In that
+     * case the saved last route is used if it matches the run's route.
+     *
+     * @param theRoute the route held by the simulation run
+     * @return a saved route with the same data as theRoute
+     * @throws IllegalStateException if no saved route matches theRoute
+     */
+    private Route findSavedRoute(final Route theRoute) {
+        if (theRoute.isSaved()) {
+            return theRoute;
+        }
+        if (myLastRoute != null && myLastRoute.isSaved() && !routeChanged(myLastRoute, theRoute)) {
+            return myLastRoute;
+        }
+        throw new IllegalStateException(
+                "Save the route before saving its simulation run.");
+    }
+
+    private static boolean routeChanged(final Route theStored, final Route theCurrent) {
+        return !theStored.getStart().equals(theCurrent.getStart())
+                || !theStored.getEnd().equals(theCurrent.getEnd())
+                || !theStored.getPathString().equals(theCurrent.getPathString())
+                || Double.compare(theStored.getDistance(), theCurrent.getDistance()) != 0;
+    }
+
+    private static boolean simulationRunChanged(final SimulationRun theStored,
+                                                final SimulationRun theCurrent,
+                                                final int theRouteId) {
+        return theStored.getRoute().getId() != theRouteId
+                || Double.compare(theStored.getAverageTraffic(), theCurrent.getAverageTraffic()) != 0
+                || theStored.getWeather() != theCurrent.getWeather()
+                || theStored.getSafetyRating() != theCurrent.getSafetyRating()
+                || Double.compare(theStored.getNormalTime(), theCurrent.getNormalTime()) != 0
+                || Double.compare(theStored.getSimulatedTime(), theCurrent.getSimulatedTime()) != 0;
+    }
+
+    /**
+     * Returns whether two lists of hazards differ. Hazards only store their
+     * type, so the lists are the same when they hold the same types the same
+     * number of times, in any order. Database IDs are ignored.
+     *
+     * @param theStored the hazards saved in the database
+     * @param theCurrent the hazards being saved
+     * @return true if the lists differ, false otherwise
+     */
+    private static boolean hazardsChanged(final List<Hazard> theStored,
+                                          final List<Hazard> theCurrent) {
+        return !countTypes(theStored).equals(countTypes(theCurrent));
+    }
+
+    private static Map<Hazard.HazardType, Integer> countTypes(final List<Hazard> theHazards) {
+        final Map<Hazard.HazardType, Integer> counts = new EnumMap<>(Hazard.HazardType.class);
+        for (final Hazard hazard : theHazards) {
+            counts.merge(hazard.getType(), 1, Integer::sum);
+        }
+        return counts;
+    }
+
+    private static boolean hazardChanged(final Hazard theStored, final Hazard theCurrent) {
+        return theStored.getSimId() != theCurrent.getSimId()
+                || theStored.getType() != theCurrent.getType();
     }
 
     // ------------------------------------------------------------------

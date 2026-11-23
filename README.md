@@ -172,6 +172,27 @@ ISSUES I HAD
    types of data and the parameters kept changing as updates were made
    throughout the week and as the team shared what they needed.
 
+Week 4/Iteration 4
+
+WHAT I WORKED ON
+- PlannerController (controller): added storeRoute, storeSimulationRun
+  and storeHazard, which save a new object or update a saved one only
+  if it changed, so the same route is not saved twice. Replanning a
+  saved route keeps its ID.
+- Merged my changes with a teammate's new save feature. File > Save
+  Route now uses my save methods, so saving the same route again only
+  adds a new simulation run instead of a duplicate route.
+- Updated the PlannerController tests for the merge and added a test
+  for saving the same route twice.
+- Cleaned up the Javadoc on the save methods.
+
+ISSUES I HAD
+1. I struggled with how to save the recommended (safer alternative)
+   routes that pop up when a route is planned. I discussed it with my
+   team for a while, and we did some group code tracing to find where
+   that route is created. I then spent time planning the best way to
+   save it. This is not finished yet.
+
 
 
 

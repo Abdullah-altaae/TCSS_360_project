@@ -5,6 +5,10 @@
 
 package model;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -179,81 +183,193 @@ public class RouteDatabase {
     }
 
     /**
-     * Loads a route by its ID.
+     * Loads a saved route by its ID. The stored path string is turned back
+     * into {@link Road} objects by looking up each road ID in the given map.
      *
      * @param theRouteId the ID of the route to load
-     * @return the distance of the route
-     * @throws SQLException if the route cannot be found or loaded
+     * @param theMap the map that holds the route's roads
+     * @return the saved route
+     * @throws NullPointerException if theMap is null
+     * @throws SQLException if no route has that ID, or one of its roads is not
+     *                      on the map
      */
-    public double loadRoute(final int theRouteId) throws SQLException {
-        final String sql = "SELECT * FROM routes WHERE route_id = ?;";
+    public Route loadRoute(final int theRouteId, final MapGraph theMap) throws SQLException {
+        Objects.requireNonNull(theMap, "map must not be null");
+        final String sql = "SELECT * FROM routes WHERE route_id = ?";
         try (Connection conn = getConnection();
-            PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, theRouteId);
-            try (final ResultSet rs = pstmt.executeQuery()) {
+            try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
-                    final String startNode = rs.getString("start_node");
-                    final String endNode = rs.getString("end_node");
-                    final  String path = rs.getString("path");
-                    final double distance = rs.getDouble("distance");
-                    return distance;
+                    return new Route(theRouteId, rs.getString("start_node"),
+                            rs.getString("end_node"), parsePath(rs.getString("path"), theMap));
                 }
             }
         }
-        throw new SQLException("Route loading failed");
+        throw new SQLException("No saved route has ID " + theRouteId);
     }
 
     /**
-     * Loads a simulation run by its ID.
+     * Loads a saved simulation run by its ID, together with its route and
+     * all of its hazards.
      *
      * @param theSimId the ID of the simulation run to load
-     * @throws SQLException if the simulation run cannot be loaded
+     * @param theMap the map that holds the run's route's roads
+     * @return the saved simulation run
+     * @throws NullPointerException if theMap is null
+     * @throws SQLException if no simulation run has that ID, or its route
+     *                      cannot be loaded
      */
-    public void loadSimulationRun(final int theSimId) throws SQLException {
+    public SimulationRun loadSimulationRun(final int theSimId, final MapGraph theMap)
+            throws SQLException {
         final String sql = "SELECT * FROM simulation_runs WHERE sim_id = ?";
         try (Connection conn = getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, theSimId);
-            try (final ResultSet rs = pstmt.executeQuery()) {
+            try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
-                    final int routeId = rs.getInt("route_id");
-                    final double averageTraffic = rs.getDouble("average_traffic");
-                    final EnvironmentSimulator.WeatherCondition weather =
-                            EnvironmentSimulator.WeatherCondition.valueOf(rs.getString("weather"));
-                    final int safetyRating = rs.getInt("safety_rating");
-                    final double normalTime = rs.getDouble("normal_time");
-                    final double simulatedTime = rs.getDouble("simulated_time");
+                    final Route route = loadRoute(rs.getInt("route_id"), theMap);
+                    return new SimulationRun(theSimId, route,
+                            rs.getDouble("average_traffic"),
+                            EnvironmentSimulator.WeatherCondition.valueOf(rs.getString("weather")),
+                            loadHazardsForSimulationRun(theSimId),
+                            rs.getInt("safety_rating"),
+                            rs.getDouble("normal_time"),
+                            rs.getDouble("simulated_time"));
                 }
             }
         }
-        throw new SQLException("Simulation Run loading failed");
+        throw new SQLException("No saved simulation run has ID " + theSimId);
+    }
 
+    public Hazard loadHazard(final int theHazardId) throws SQLException {
+        final String sql = "SELECT * FROM hazards WHERE hazard_id = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, theHazardId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return new Hazard(theHazardId, rs.getInt("sim_id"),
+                            Hazard.HazardType.valueOf(rs.getString("hazard_type")));
+                }
+            }
+        }
+        throw new SQLException("No saved hazard has ID " + theHazardId);
+    }
+
+    public List<Hazard> loadHazardsForSimulationRun(final int theSimId) throws SQLException {
+        final String sql = "SELECT * FROM hazards WHERE sim_id = ? ORDER BY hazard_id";
+        final List<Hazard> hazards = new ArrayList<>();
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, theSimId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    hazards.add(new Hazard(rs.getInt("hazard_id"), theSimId,
+                            Hazard.HazardType.valueOf(rs.getString("hazard_type"))));
+                }
+            }
+        }
+        return hazards;
+    }
+
+    public void updateRoute(final int theRouteId, final String theStartNode,
+                            final String theEndNode, final String thePath,
+                            final double theDistance) throws SQLException {
+        final String sql = "UPDATE routes SET start_node = ?, end_node = ?, path = ?, distance = ? WHERE route_id = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, theStartNode);
+            pstmt.setString(2, theEndNode);
+            pstmt.setString(3, thePath);
+            pstmt.setDouble(4, theDistance);
+            pstmt.setInt(5, theRouteId);
+            requireOneRowChanged(pstmt.executeUpdate(), "route", theRouteId);
+        }
+    }
+
+    public void updateSimulationRun(final int theSimId, final int theRouteId,
+                                    final double theAverageTraffic,
+                                    final EnvironmentSimulator.WeatherCondition theWeather,
+                                    final int theSafetyRating, final double theNormalTime,
+                                    final double theSimulatedTime) throws SQLException {
+        Objects.requireNonNull(theWeather, "weather must not be null");
+        final String sql = "UPDATE simulation_runs SET route_id = ?, average_traffic = ?, weather = ?, safety_rating = ?, normal_time = ?, simulated_time = ? WHERE sim_id = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, theRouteId);
+            pstmt.setDouble(2, theAverageTraffic);
+            pstmt.setString(3, theWeather.name());
+            pstmt.setInt(4, theSafetyRating);
+            pstmt.setDouble(5, theNormalTime);
+            pstmt.setDouble(6, theSimulatedTime);
+            pstmt.setInt(7, theSimId);
+            requireOneRowChanged(pstmt.executeUpdate(), "simulation run", theSimId);
+        }
+    }
+
+    public void updateHazard(final int theHazardId, final int theSimId,
+                             final Hazard.HazardType theType, final int thePenalty)
+            throws SQLException {
+        Objects.requireNonNull(theType, "hazard type must not be null");
+        final String sql = "UPDATE hazards SET sim_id = ?, hazard_type = ?, penalty = ? WHERE hazard_id = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, theSimId);
+            pstmt.setString(2, theType.name());
+            pstmt.setInt(3, thePenalty);
+            pstmt.setInt(4, theHazardId);
+            requireOneRowChanged(pstmt.executeUpdate(), "hazard", theHazardId);
+        }
     }
 
     /**
-     * Loads a hazard by its ID.
+     * Replaces all of a simulation run's hazards with the given ones. The old
+     * hazards are deleted and the new ones inserted in a single transaction,
+     * so if anything fails the run keeps its old hazards.
      *
-     * @param theHazardId the ID of the hazard to load
-     * @throws SQLException if the hazard cannot be loaded
+     * @param theSimId the ID of the simulation run the hazards belong to
+     * @param theHazards the hazards the run should have from now on
+     * @return the given hazards, in the same order, with their new database
+     *         IDs and the simulation run's ID filled in
+     * @throws NullPointerException if theHazards is null
+     * @throws SQLException if the hazards cannot be replaced, for example
+     *                      because no simulation run has that ID
      */
-    public void loadHazard(final int theHazardId) throws SQLException {
-        final String sql = "SELECT * FROM hazards WHERE hazard_id = ?";
-        try (Connection conn = getConnection();
-            PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            pstmt.setInt(1, theHazardId);
-            try (final ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    final int simId = rs.getInt("sim_id");
-                    final Hazard.HazardType type = Hazard.HazardType.valueOf(rs.getString("hazard_type"));
-                    final int penalty = rs.getInt("penalty");
+    public List<Hazard> replaceHazards(final int theSimId, final List<Hazard> theHazards)
+            throws SQLException {
+        Objects.requireNonNull(theHazards, "hazards must not be null");
+        final String deleteSql = "DELETE FROM hazards WHERE sim_id = ?";
+        final String insertSql = "INSERT INTO hazards (sim_id, hazard_type, penalty) VALUES (?, ?, ?)";
+        final List<Hazard> saved = new ArrayList<>();
+        try (Connection conn = getConnection()) {
+            conn.setAutoCommit(false);
+            try (PreparedStatement delete = conn.prepareStatement(deleteSql);
+                 PreparedStatement insert = conn.prepareStatement(insertSql,
+                         Statement.RETURN_GENERATED_KEYS)) {
+                delete.setInt(1, theSimId);
+                delete.executeUpdate();
+                for (final Hazard hazard : theHazards) {
+                    insert.setInt(1, theSimId);
+                    insert.setString(2, hazard.getType().name());
+                    insert.setInt(3, hazard.getPenalty());
+                    insert.executeUpdate();
+                    try (ResultSet rs = insert.getGeneratedKeys()) {
+                        if (!rs.next()) {
+                            throw new SQLException(
+                                    "Insert of hazard succeeded but no generated id was returned");
+                        }
+                        saved.add(hazard.withIds(rs.getInt(1), theSimId));
+                    }
                 }
+                conn.commit();
+            } catch (final SQLException ex) {
+                conn.rollback();
+                throw ex;
             }
         }
-        throw new SQLException("Hazard loading failed");
-
+        return saved;
     }
-
-
 
     /**
      * Deletes a route by its ID.
@@ -297,6 +413,45 @@ public class RouteDatabase {
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, theHazardId);
             pstmt.execute ();
+        }
+    }
+
+
+
+    /**
+     * Turns a stored path string such as "1,2,3" back into the roads it names,
+     * in travel order.
+     *
+     * @param thePath the stored path string
+     * @param theMap the map to look the road IDs up in
+     * @return the roads in travel order, which is empty for an empty path
+     * @throws SQLException if the path names a road that is not on the map
+     */
+    private List<Road> parsePath(final String thePath, final MapGraph theMap)
+            throws SQLException {
+        final Map<Integer, Road> roadsById = new HashMap<>();
+        for (final Road road : theMap.getRoads()) {
+            roadsById.put(road.getId(), road);
+        }
+        final List<Road> path = new ArrayList<>();
+        if (thePath.isEmpty()) {
+            return path;
+        }
+        for (final String part : thePath.split(",")) {
+            final Road road = roadsById.get(Integer.parseInt(part.trim()));
+            if (road == null) {
+                throw new SQLException("Saved route uses road " + part
+                        + ", which is not on the map");
+            }
+            path.add(road);
+        }
+        return path;
+    }
+
+    private void requireOneRowChanged(final int theRowCount, final String theName,
+                                      final int theId) throws SQLException {
+        if (theRowCount == 0) {
+            throw new SQLException("No saved " + theName + " has ID " + theId);
         }
     }
 
