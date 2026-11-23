@@ -7,6 +7,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,6 +23,7 @@ import org.junit.jupiter.api.Test;
 
 import model.EnvironmentSimulator;
 import model.EnvironmentSimulator.WeatherCondition;
+import model.Hazard;
 import model.Intersection;
 import model.MapGraph;
 import model.Road;
@@ -31,7 +40,7 @@ import model.SafetyRating;
  * </p>
  *
  * @author Anjana Virani
- * @version 15 November 2026
+ * @version 21 November 2026
  */
 class PlannerControllerTest {
 
@@ -464,5 +473,197 @@ class PlannerControllerTest {
         assertTrue(report.hasAlternative());
         assertEquals("Q", report.getAlternative().get(0).getEnd());
         assertTrue(report.getAlternativeScore() > report.getScore());
+    }
+
+    // ---------- blocked start and end ----------
+
+    /** A blocked start intersection gives a clear message. */
+    @Test
+    void testComputeRouteBlockedStart() {
+        myController.setIntersectionBlocked("A", true);
+        final IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> myController.computeRoute("A", "C"));
+        assertTrue(ex.getMessage().contains("Start intersection A is blocked"));
+    }
+
+    /** A blocked end intersection gives a clear message. */
+    @Test
+    void testComputeRouteBlockedEnd() {
+        myController.setIntersectionBlocked("C", true);
+        final IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> myController.computeRoute("A", "C"));
+        assertTrue(ex.getMessage().contains("End intersection C is blocked"));
+    }
+
+    // ---------- normal vs simulated time ----------
+
+    /** In clear weather with no traffic, simulated time equals normal time. */
+    @Test
+    void testSimulatedTimeEqualsNormalWhenClear() {
+        final List<Road> route = myController.computeRoute("A", "C");
+        assertEquals(myController.getNormalTime(route),
+                myController.getSimulatedTime(route), 1e-9);
+    }
+
+    /** Rain makes the simulated time longer than the normal time. */
+    @Test
+    void testSimulatedTimeLongerInRain() {
+        final List<Road> route = myController.computeRoute("A", "C");
+        myController.setWeather(WeatherCondition.RAINY);
+        assertTrue(myController.getSimulatedTime(route) > myController.getNormalTime(route));
+    }
+
+    // ---------- traffic intensity ----------
+
+    /** A traffic delay also sets the road's traffic intensity. */
+    @Test
+    void testTrafficDelaySetsIntensity() {
+        myController.setTrafficDelay(0, 10);
+        assertEquals(0.5, mySimulator.getTrafficIntensity(myController.findRoad(0)), 1e-9);
+        myController.setTrafficDelay(0, 60);
+        assertEquals(1.0, mySimulator.getTrafficIntensity(myController.findRoad(0)), 1e-9);
+    }
+
+    /** Reset clears the traffic intensity. */
+    @Test
+    void testResetClearsTrafficIntensity() {
+        myController.setTrafficDelay(0, 20);
+        myController.resetConditions();
+        assertEquals(0.0, mySimulator.getTrafficIntensity(myController.findRoad(0)), 1e-9);
+    }
+
+    /** Heavy traffic on a road of the route is reported and marked by road ID. */
+    @Test
+    void testHeavyTrafficHazardIsLocated() {
+        final List<Road> route = myController.computeRoute("A", "C");
+        myController.setTrafficDelay(route.get(0).getId(), 20);
+        final PlannerController.SafetyReport report = myController.checkSafety(route);
+        assertTrue(report.getHazardRoadIds().contains(route.get(0).getId()));
+        assertTrue(report.getWarnings().get(0).contains("Heavy traffic"));
+        assertTrue(report.getScore() < 100);
+    }
+
+    /** Rain with moderate traffic is reported as rain combined with traffic. */
+    @Test
+    void testRainAndTrafficHazard() {
+        final List<Road> route = myController.computeRoute("A", "C");
+        myController.setWeather(WeatherCondition.RAINY);
+        myController.setTrafficDelay(route.get(0).getId(), 10);
+        final PlannerController.SafetyReport report = myController.checkSafety(route);
+        assertTrue(report.getWarnings().get(0).contains("Rain combined with heavy traffic"));
+    }
+
+    // ---------- database: saving routes ----------
+
+    /** The URL of the database used by the most recent databaseController call. */
+    private String myDatabaseUrl;
+
+    /**
+     * Creates a controller on the test map that uses a new, empty database file.
+     *
+     * @return a controller whose database is ready
+     * @throws IOException if the temporary file cannot be created
+     */
+    private PlannerController databaseController() throws IOException {
+        final File file = Files.createTempFile("planner-test", ".db").toFile();
+        file.delete();
+        file.deleteOnExit();
+        myDatabaseUrl = "jdbc:sqlite:" + file.getAbsolutePath();
+        final PlannerController controller =
+                new PlannerController(myMap, myPlanner, mySimulator, myDatabaseUrl);
+        assertTrue(controller.initializeDatabase());
+        return controller;
+    }
+
+    /**
+     * Runs a query that returns one number, directly with JDBC, so the checks
+     * do not depend on the code being tested.
+     *
+     * @param theSql the query
+     * @return the number in the first column of the first row
+     * @throws SQLException if the query fails
+     */
+    private double queryNumber(final String theSql) throws SQLException {
+        try (Connection conn = DriverManager.getConnection(myDatabaseUrl);
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(theSql)) {
+            assertTrue(rs.next());
+            return rs.getDouble(1);
+        }
+    }
+
+    /** Without a database, saving is not available. */
+    @Test
+    void testNoDatabase() {
+        assertFalse(myController.initializeDatabase());
+        assertFalse(myController.hasDatabase());
+        assertNotNull(myController.getDatabaseProblem());
+        assertThrows(IllegalStateException.class,
+                () -> myController.saveRoute(myController.computeRoute("A", "C")));
+    }
+
+    /** A new database is ready to use. */
+    @Test
+    void testDatabaseReady() throws IOException {
+        final PlannerController controller = databaseController();
+        assertTrue(controller.hasDatabase());
+        assertEquals(null, controller.getDatabaseProblem());
+    }
+
+    /** Saving a route stores its start, end, path and distance. */
+    @Test
+    void testSaveRoute() throws IOException, SQLException {
+        final PlannerController controller = databaseController();
+        final int id = controller.saveRoute(controller.computeRoute("A", "C"));
+        assertTrue(id >= 1);
+        assertEquals(1.0, queryNumber("SELECT COUNT(*) FROM routes"), 1e-9);
+        assertEquals(2.0, queryNumber("SELECT distance FROM routes WHERE route_id = " + id),
+                1e-9);
+        assertEquals(1.0, queryNumber("SELECT COUNT(*) FROM routes WHERE start_node = 'A' "
+                + "AND end_node = 'C' AND path = '0,2'"), 1e-9);
+    }
+
+    /** Saving stores a simulation run with the safety score and both times. */
+    @Test
+    void testSaveStoresSimulationRun() throws IOException, SQLException {
+        final PlannerController controller = databaseController();
+        final List<Road> route = controller.computeRoute("A", "C");
+        controller.setWeather(WeatherCondition.RAINY);
+        final int id = controller.saveRoute(route);
+
+        final String where = " FROM simulation_runs WHERE route_id = " + id;
+        assertEquals(1.0, queryNumber("SELECT COUNT(*)" + where), 1e-9);
+        assertEquals(controller.checkSafety(route).getScore(),
+                queryNumber("SELECT safety_rating" + where), 1e-9);
+        assertEquals(1.0, queryNumber("SELECT COUNT(*)" + where + " AND weather = 'RAINY'"),
+                1e-9);
+        assertTrue(queryNumber("SELECT simulated_time" + where)
+                > queryNumber("SELECT normal_time" + where));
+    }
+
+    /** Saving stores the hazards found on the route. */
+    @Test
+    void testSaveStoresHazards() throws IOException, SQLException {
+        final PlannerController controller = databaseController();
+        final List<Road> route = controller.computeRoute("A", "C");
+        controller.setWeather(WeatherCondition.SNOWY);
+        controller.saveRoute(route);
+        assertEquals(1.0, queryNumber("SELECT COUNT(*) FROM hazards "
+                + "WHERE hazard_type = '" + Hazard.HazardType.SNOW.name() + "'"), 1e-9);
+    }
+
+    /** A route with no hazards saves no hazards. */
+    @Test
+    void testSaveSafeRouteHasNoHazards() throws IOException, SQLException {
+        final PlannerController controller = databaseController();
+        controller.saveRoute(controller.computeRoute("A", "C"));
+        assertEquals(0.0, queryNumber("SELECT COUNT(*) FROM hazards"), 1e-9);
+    }
+
+    /** An empty route cannot be saved. */
+    @Test
+    void testSaveEmptyRoute() throws IOException {
+        final PlannerController controller = databaseController();
+        assertThrows(IllegalArgumentException.class, () -> controller.saveRoute(List.of()));
     }
 }

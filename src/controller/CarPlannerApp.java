@@ -15,14 +15,17 @@ import view.PlannerDashboard;
  * Entry point for the Self-Driving Car Route Planner.
  * <p>
  * Builds a small sample city map, then connects the three MVC parts:
- * the model (map, route planner and environment simulator), the controller
+ * the model (map, route planner, environment simulator and database), the controller
  * ({@link PlannerController}) and the view ({@link PlannerDashboard}).
  * </p>
  *
  * @author Anjana Virani
- * @version 15 November 2026
+ * @version 21 November 2026
  */
 public final class CarPlannerApp {
+
+    /** The SQLite database file that saved routes are stored in. */
+    private static final String DATABASE_URL = "jdbc:sqlite:CarPlanner_DataBase.db";
 
     /** Private constructor so this class cannot be instantiated. */
     private CarPlannerApp() {
@@ -38,12 +41,18 @@ public final class CarPlannerApp {
         final MapGraph map = buildSampleMap();
         final EnvironmentSimulator simulator = new EnvironmentSimulator(map);
         final RoutePlanner planner = new RoutePlanner(map, simulator);
-        final PlannerController controller = new PlannerController(map, planner, simulator);
+        final PlannerController controller =
+                new PlannerController(map, planner, simulator, DATABASE_URL);
+        controller.initializeDatabase();
 
         SwingUtilities.invokeLater(() -> {
             final PlannerDashboard view = new PlannerDashboard(map, controller);
             controller.setView(view);
             view.setVisible(true);
+            if (!controller.hasDatabase()) {
+                view.logError("Saving routes is not available. "
+                        + controller.getDatabaseProblem());
+            }
         });
     }
 

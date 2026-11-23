@@ -1,5 +1,6 @@
 package controller;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -13,6 +14,8 @@ import model.Hazard;
 import model.Intersection;
 import model.MapGraph;
 import model.Road;
+import model.Route;
+import model.RouteDatabase;
 import model.RoutePlanner;
 import model.SafetyChecker;
 import model.SafetyRating;
@@ -37,14 +40,30 @@ import view.PlannerDashboard;
  * {@link SafetyChecker} for the route's hazards and safety rating and
  * sends a {@link SafetyReport} to the view.
  * </p>
+ * <p>
+ * When a database URL is given, routes can be saved together with a
+ * simulation run and its hazards ({@link RouteDatabase}).
+ * </p>
  *
  * @author Anjana Virani
- * @version 15 November 2026
+ * @version 21 November 2026
  */
 public class PlannerController {
 
     /** How many routes to ask the planner for when looking for a safer one. */
     private static final int ALTERNATIVES_TO_CHECK = 3;
+
+    /**
+     * The traffic delay, in minutes, that counts as the heaviest traffic
+     * (intensity 1.0). A 10 minute delay is intensity 0.5.
+     */
+    private static final double MINUTES_FOR_FULL_TRAFFIC = 20.0;
+
+    /** Traffic intensity at which SafetyChecker reports heavy traffic. */
+    private static final double HEAVY_TRAFFIC = 0.7;
+
+    /** Traffic intensity at which SafetyChecker reports rain with traffic. */
+    private static final double RAIN_TRAFFIC = 0.5;
 
     /** Number of minutes in one hour. */
     private static final double MINUTES_PER_HOUR = 60.0;
@@ -61,6 +80,18 @@ public class PlannerController {
     /** The safety checker that finds hazards on a route. */
     private final SafetyChecker mySafetyChecker;
 
+    /** Writes routes to the database, or null if there is no database. */
+    private final RouteDatabase myDatabase;
+
+    /** Whether the database tables are ready to use. */
+    private boolean myDatabaseReady;
+
+    /** Why the database cannot be used, or null if it can. */
+    private String myDatabaseProblem = "No database was set up.";
+
+    /** The last route shown to the user, or an empty list. */
+    private List<Road> myLastRoute = List.of();
+
     /** The view that displays results, or null until it is set. */
     private PlannerDashboard myView;
 
@@ -71,7 +102,8 @@ public class PlannerController {
     private String myLastEndId;
 
     /**
-     * Creates a controller for the given map, route planner and simulator.
+     * Creates a controller for the given map, route planner and simulator,
+     * with no database. Saving and loading routes is not available.
      *
      * @param theMap the city map
      * @param thePlanner the route planner
@@ -80,10 +112,29 @@ public class PlannerController {
      */
     public PlannerController(final MapGraph theMap, final RoutePlanner thePlanner,
                              final EnvironmentSimulator theSimulator) {
+        this(theMap, thePlanner, theSimulator, null);
+    }
+
+    /**
+     * Creates a controller for the given map, route planner, simulator and
+     * database. Call {@link #initializeDatabase()} before saving routes.
+     *
+     * @param theMap the city map
+     * @param thePlanner the route planner
+     * @param theSimulator the environment simulator
+     * @param theDatabaseUrl the database URL, for example
+     *                       "jdbc:sqlite:CarPlanner_DataBase.db", or null for
+     *                       no database
+     * @throws NullPointerException if theMap, thePlanner or theSimulator is null
+     */
+    public PlannerController(final MapGraph theMap, final RoutePlanner thePlanner,
+                             final EnvironmentSimulator theSimulator,
+                             final String theDatabaseUrl) {
         myMap = Objects.requireNonNull(theMap, "map must not be null");
         myPlanner = Objects.requireNonNull(thePlanner, "planner must not be null");
         mySimulator = Objects.requireNonNull(theSimulator, "simulator must not be null");
         mySafetyChecker = new SafetyChecker(mySimulator, myMap);
+        myDatabase = theDatabaseUrl == null ? null : new RouteDatabase(theDatabaseUrl);
     }
 
     /**
@@ -206,6 +257,14 @@ public class PlannerController {
             throw new IllegalArgumentException("Unknown intersection: "
                     + (start == null ? theStartId : theEndId));
         }
+        if (start.isBlocked()) {
+            throw new IllegalArgumentException(
+                    "Start intersection " + theStartId + " is blocked.");
+        }
+        if (end.isBlocked()) {
+            throw new IllegalArgumentException(
+                    "End intersection " + theEndId + " is blocked.");
+        }
 
         final List<Road> route = myPlanner.findRoute(start, end);
         if (route == null || route.isEmpty()) {
@@ -225,21 +284,197 @@ public class PlannerController {
      * @throws IllegalStateException if no view has been set
      */
     public void planRoute(final String theStartId, final String theEndId) {
+        planRoute(theStartId, theEndId, false);
+    }
+
+    /**
+     * Plans a route and tells the view the result. Automatic re-plans (after
+     * a condition changes) only log errors, so the user does not get a
+     * pop-up for every change.
+     *
+     * @param theStartId the name of the start intersection
+     * @param theEndId the name of the end intersection
+     * @param theAutomatic true if this is an automatic re-plan
+     * @throws IllegalStateException if no view has been set
+     */
+    private void planRoute(final String theStartId, final String theEndId,
+                           final boolean theAutomatic) {
         if (myView == null) {
             throw new IllegalStateException("setView must be called before planRoute");
         }
         try {
             final List<Road> route = computeRoute(theStartId, theEndId);
-            myView.showRoute(route);
-            myView.showSafetyReport(checkSafety(route));
+            showRouteInView(route);
             myLastStartId = theStartId;
             myLastEndId = theEndId;
-        } catch (final IllegalArgumentException ex) {
-            myView.clearRoute();
-            myView.showError(ex.getMessage());
         } catch (final RuntimeException ex) {
+            final String message = ex instanceof IllegalArgumentException
+                    ? ex.getMessage() : "Route planning failed: " + ex.getMessage();
+            myLastRoute = List.of();
             myView.clearRoute();
-            myView.showError("Route planning failed: " + ex.getMessage());
+            if (theAutomatic) {
+                myView.logError(message);
+            } else {
+                myView.showError(message);
+            }
+        }
+    }
+
+    /**
+     * Shows a route and its safety report in the view and remembers it as
+     * the last route, so it can be saved.
+     *
+     * @param theRoute the route to show
+     */
+    private void showRouteInView(final List<Road> theRoute) {
+        myLastRoute = List.copyOf(theRoute);
+        myView.showRoute(theRoute);
+        myView.showSafetyReport(checkSafety(theRoute));
+    }
+
+    /**
+     * Returns the last route shown to the user.
+     *
+     * @return an unmodifiable list of the route's roads, or an empty list if
+     *         no route is shown
+     */
+    public List<Road> getLastRoute() {
+        return myLastRoute;
+    }
+
+    /**
+     * Returns a route's travel time at the speed limits, with no weather or
+     * traffic.
+     *
+     * @param theRoute the route
+     * @return the normal travel time, in hours
+     */
+    public double getNormalTime(final List<Road> theRoute) {
+        return myPlanner.getNormalTime(theRoute);
+    }
+
+    /**
+     * Returns a route's travel time under the current weather and traffic.
+     *
+     * @param theRoute the route
+     * @return the simulated travel time, in hours
+     */
+    public double getSimulatedTime(final List<Road> theRoute) {
+        return myPlanner.getSimulatedTime(theRoute);
+    }
+
+    // ------------------------------------------------------------------
+    // Saving routes (database)
+    // ------------------------------------------------------------------
+
+    /**
+     * Creates the database tables if they do not exist yet. Saving only works
+     * after this returns true.
+     *
+     * @return true if the database is ready, false if there is no database
+     *         or it cannot be used (see {@link #getDatabaseProblem()})
+     */
+    public boolean initializeDatabase() {
+        myDatabaseReady = false;
+        if (myDatabase == null) {
+            myDatabaseProblem = "No database was set up.";
+            return false;
+        }
+        try {
+            myDatabase.createTables();
+            myDatabaseReady = true;
+            myDatabaseProblem = null;
+        } catch (final SQLException ex) {
+            myDatabaseProblem = "The database cannot be used (" + ex.getMessage() + ").";
+        }
+        return myDatabaseReady;
+    }
+
+    /**
+     * Returns whether routes can be saved.
+     *
+     * @return true if the database is ready
+     */
+    public boolean hasDatabase() {
+        return myDatabaseReady;
+    }
+
+    /**
+     * Returns why the database cannot be used.
+     *
+     * @return a description of the problem, or null if the database is ready
+     */
+    public String getDatabaseProblem() {
+        return myDatabaseProblem;
+    }
+
+    /**
+     * Saves a route to the database together with one simulation run under the
+     * current conditions (weather, average traffic, safety score, normal and
+     * simulated travel times) and every hazard found on it.
+     *
+     * @param theRoute the route to save
+     * @return the saved route's database ID
+     * @throws IllegalStateException if the database is not ready
+     * @throws IllegalArgumentException if theRoute is empty
+     * @throws NullPointerException if theRoute is null
+     * @throws SQLException if the route cannot be saved
+     */
+    public int saveRoute(final List<Road> theRoute) throws SQLException {
+        requireDatabase();
+        Objects.requireNonNull(theRoute, "route must not be null");
+        if (theRoute.isEmpty()) {
+            throw new IllegalArgumentException("There is no route to save.");
+        }
+        final Route route = new Route(theRoute.get(0).getStart(),
+                theRoute.get(theRoute.size() - 1).getEnd(), theRoute);
+
+        final int routeId = myDatabase.saveRoute(route.getStart(), route.getEnd(),
+                route.getPathString(), route.getDistance());
+        final int simId = myDatabase.saveSimulationRun(routeId,
+                mySimulator.averageTrafficIntensity(route), mySimulator.getWeather(),
+                mySafetyChecker.calculateSafetyRating(theRoute),
+                getNormalTime(theRoute), getSimulatedTime(theRoute));
+        for (final Hazard hazard : mySafetyChecker.findHazards(theRoute)) {
+            myDatabase.saveHazard(simId, hazard.getType(), hazard.getPenalty());
+        }
+        return routeId;
+    }
+
+    /**
+     * Handles File &gt; Save Route: saves the route currently shown and
+     * reports the result in the view.
+     */
+    public void handleSaveRoute() {
+        if (!myDatabaseReady) {
+            myView.showError("Routes cannot be saved. " + myDatabaseProblem);
+            return;
+        }
+        if (myLastRoute.isEmpty()) {
+            myView.showError("Plan a route before saving it.");
+            return;
+        }
+        try {
+            final int id = saveRoute(myLastRoute);
+            myView.showMessage("Route saved as #" + id + " ("
+                    + myLastRoute.get(0).getStart() + " -> "
+                    + myLastRoute.get(myLastRoute.size() - 1).getEnd()
+                    + ", weather " + getWeather() + ").");
+        } catch (final SQLException ex) {
+            myView.showError("Could not save the route: " + ex.getMessage()
+                    + ". If the database file was made by an older version of the "
+                    + "program, delete it and restart.");
+        }
+    }
+
+    /**
+     * Checks that the database is ready.
+     *
+     * @throws IllegalStateException if it is not
+     */
+    private void requireDatabase() {
+        if (!myDatabaseReady) {
+            throw new IllegalStateException("The database is not ready: " + myDatabaseProblem);
         }
     }
 
@@ -281,28 +516,25 @@ public class PlannerController {
             hazardIntersections.add(turn.getId());
         }
 
-        int snow = 0;
-        int rainAndTraffic = 0;
-        int heavyTraffic = 0;
-        for (final Hazard hazard : mySafetyChecker.findHazards(theRoute)) {
-            switch (hazard.getType()) {
-                case SNOW -> snow++;
-                case RAIN_AND_TRAFFIC -> rainAndTraffic++;
-                case HEAVY_TRAFFIC -> heavyTraffic++;
-                default -> {
-                    // blocked items and sharp turns are listed above with locations
-                }
+        // Traffic hazards use the same rules as SafetyChecker.findHazards,
+        // checked road by road so each one can be marked on the map.
+        final boolean rainy = mySimulator.getWeather() == WeatherCondition.RAINY;
+        for (final Road road : theRoute) {
+            final double intensity = mySimulator.getTrafficIntensity(road);
+            final String where = road.getStart() + " -> " + road.getEnd();
+            if (rainy && intensity >= RAIN_TRAFFIC) {
+                warnings.add("Rain combined with heavy traffic on " + where);
+                hazardRoads.add(road.getId());
+            } else if (intensity >= HEAVY_TRAFFIC) {
+                warnings.add("Heavy traffic on " + where);
+                hazardRoads.add(road.getId());
             }
         }
-        if (snow > 0) {
-            warnings.add("Snowy weather: slower speeds and less traction");
-        }
-        if (rainAndTraffic > 0) {
-            warnings.add("Rain combined with heavy traffic on "
-                    + rainAndTraffic + " road(s)");
-        }
-        if (heavyTraffic > 0) {
-            warnings.add("Heavy traffic on " + heavyTraffic + " road(s)");
+
+        for (final Hazard hazard : mySafetyChecker.findHazards(theRoute)) {
+            if (hazard.getType() == Hazard.HazardType.SNOW) {
+                warnings.add("Snowy weather: slower speeds and less traction");
+            }
         }
 
         final int score = mySafetyChecker.calculateSafetyRating(theRoute);
@@ -402,7 +634,9 @@ public class PlannerController {
     }
 
     /**
-     * Sets the traffic delay on a road.
+     * Sets the traffic delay on a road. The delay also sets the road's
+     * traffic intensity for the SafetyChecker: 20 minutes or more is the
+     * heaviest traffic (1.0), and 10 minutes is 0.5.
      *
      * @param theId the ID of the road
      * @param theMinutes the extra travel time caused by traffic, in minutes
@@ -416,6 +650,8 @@ public class PlannerController {
         }
         final Road road = requireRoad(theId);
         mySimulator.changeTraffic(road, theMinutes / MINUTES_PER_HOUR);
+        mySimulator.setTrafficIntensity(road,
+                Math.min(1.0, theMinutes / MINUTES_FOR_FULL_TRAFFIC));
         conditionsChanged(String.format("Traffic on road %s -> %s set to %.0f minute(s).",
                 road.getStart(), road.getEnd(), theMinutes));
     }
@@ -432,6 +668,7 @@ public class PlannerController {
         for (final Road road : myMap.getRoads()) {
             mySimulator.unBlockedRoad(road);
             mySimulator.changeTraffic(road, 0.0);
+            mySimulator.setTrafficIntensity(road, 0.0);
         }
         conditionsChanged("All conditions reset to normal.");
     }
@@ -465,7 +702,7 @@ public class PlannerController {
         myView.showMessage(theMessage);
         myView.refreshMap();
         if (myLastStartId != null && myLastEndId != null) {
-            planRoute(myLastStartId, myLastEndId);
+            planRoute(myLastStartId, myLastEndId, true);
         }
     }
 
